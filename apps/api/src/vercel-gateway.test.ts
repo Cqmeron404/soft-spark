@@ -12,6 +12,7 @@ import { cors } from "hono/cors";
 import { Readable } from "node:stream";
 import { GET, OPTIONS, POST, ensureWebRequest, readIncomingBody, vercelHandler } from "./vercel-gateway.js";
 import { corsAllowOrigin } from "./cors.js";
+import { INTERNAL_JOB_HEADER } from "./env.js";
 import { resetGetApp } from "./server.js";
 
 const failures: string[] = [];
@@ -154,6 +155,106 @@ async function viaNodeHttpServer() {
     );
   } finally {
     await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+  }
+}
+
+async function viaProdInternalLockNoDb() {
+  const prev = {
+    NODE_ENV: process.env.NODE_ENV,
+    AUTH_MODE: process.env.AUTH_MODE,
+    INTERNAL_JOB_SECRET: process.env.INTERNAL_JOB_SECRET,
+    DATABASE_URL: process.env.DATABASE_URL,
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+  };
+  process.env.NODE_ENV = "production";
+  delete process.env.AUTH_MODE;
+  delete process.env.INTERNAL_JOB_SECRET;
+  delete process.env.DATABASE_URL;
+  delete process.env.BETTER_AUTH_SECRET;
+  try {
+    const events = await withTimeout(
+      GET(new Request("https://soft-spark-api.vercel.app/internal/events")),
+      4000,
+      "prod GET /internal/events (no DB)"
+    );
+    if (!events) {
+      failures.push("prod GET /internal/events returned void");
+      return;
+    }
+    const eventsBody = (await events.json().catch(() => ({}))) as { error?: string };
+    check(events.status === 404, `prod GET /internal/events status ${events.status} (no Postgres boot)`);
+    check(eventsBody.error === "not_found", `prod GET /internal/events body ${JSON.stringify(eventsBody)}`);
+
+    const rewritten = await withTimeout(
+      GET(new Request("https://soft-spark-api.vercel.app/api/internal/events")),
+      4000,
+      "prod GET /api/internal/events"
+    );
+    if (!rewritten) {
+      failures.push("prod GET /api/internal/events returned void");
+    } else {
+      check(rewritten.status === 404, `prod GET /api/internal/events status ${rewritten.status}`);
+    }
+
+    const orch = await withTimeout(
+      POST(
+        new Request("https://soft-spark-api.vercel.app/internal/orchestrate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}",
+        })
+      ),
+      4000,
+      "prod POST /internal/orchestrate unauth"
+    );
+    if (!orch) {
+      failures.push("prod POST /internal/orchestrate returned void");
+      return;
+    }
+    const orchBody = (await orch.json().catch(() => ({}))) as { error?: string };
+    check(orch.status === 401, `prod POST /internal/orchestrate status ${orch.status}`);
+    check(orchBody.error === "unauthorized", `prod POST /internal/orchestrate body ${JSON.stringify(orchBody)}`);
+
+    process.env.INTERNAL_JOB_SECRET = "gateway-internal-job-test-secret";
+    const wrong = await withTimeout(
+      POST(
+        new Request("https://soft-spark-api.vercel.app/internal/orchestrate", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            [INTERNAL_JOB_HEADER]: "nope",
+          },
+          body: "{}",
+        })
+      ),
+      4000,
+      "prod POST /internal/orchestrate wrong secret"
+    );
+    if (!wrong) {
+      failures.push("prod wrong-secret orchestrate returned void");
+    } else {
+      check(wrong.status === 401, `prod POST /internal/orchestrate wrong secret status ${wrong.status}`);
+    }
+
+    if (prev.NODE_ENV === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = prev.NODE_ENV;
+    delete process.env.INTERNAL_JOB_SECRET;
+    process.env.AUTH_MODE = "prod";
+    const authMode = await withTimeout(
+      GET(new Request("https://soft-spark-api.vercel.app/internal/events")),
+      4000,
+      "AUTH_MODE=prod GET /internal/events"
+    );
+    if (!authMode) {
+      failures.push("AUTH_MODE=prod GET /internal/events returned void");
+    } else {
+      check(authMode.status === 404, `AUTH_MODE=prod GET /internal/events status ${authMode.status}`);
+    }
+  } finally {
+    for (const [key, value] of Object.entries(prev)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
 }
 
@@ -663,6 +764,7 @@ async function main() {
   await viaWebRequest();
   await viaRewriteDestination();
   await viaNodeHttpServer();
+  await viaProdInternalLockNoDb();
   await viaProdSeedEnv();
   await viaAuthPreflightNoDb();
   await viaEnsureWebRequestPostBody();
