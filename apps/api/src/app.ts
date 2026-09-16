@@ -6,7 +6,7 @@ import type { LookingFor, OnboardBody, PriceTier } from "@soft-spark/shared";
 import {
   BIO_MAX,
   BOT_NAME_MAX,
-  JOB_TEXT_MAX,
+  geoForPlace,
   normalizePreferredAction,
   normalizeShortText,
   normalizeTagList,
@@ -83,11 +83,13 @@ export function createApp(deps: AppDeps) {
     if (!prefs?.cuisine?.length || !prefs.maxTravelKm || !prefs.budget) {
       return c.json({ error: "prefs cuisine, budget, maxTravelKm required" }, 400);
     }
-    if (!body.homeGeo) return c.json({ error: "homeGeo required" }, 400);
+    if (!body.homeGeo && !profile.city) return c.json({ error: "homeGeo or profile.city required" }, 400);
 
     const session = await resolveSession(auth, db, c.req.raw.headers);
     const email = session?.user.email ?? `${authId}@users.softspark`;
     const existing = await store.userByAuthId(authId);
+    const hobbies = normalizeTagList(profile.hobbies ?? prefs.interests);
+    const place = geoForPlace(profile.city, profile.neighborhood);
     const profilePatch = {
       displayName: profile.displayName,
       age: profile.age,
@@ -95,15 +97,17 @@ export function createApp(deps: AppDeps) {
       interestedIn: profile.interestedIn ?? [],
       bio: normalizeShortText(profile.bio, BIO_MAX),
       photoUrl: body.photoUrl,
-      homeLat: body.homeGeo.lat,
-      homeLng: body.homeGeo.lng,
+      homeLat: body.homeGeo?.lat ?? place.lat,
+      homeLng: body.homeGeo?.lng ?? place.lng,
       homeTz: body.homeTz ?? "America/Denver",
       height: normalizeShortText(profile.height),
       hairColor: normalizeShortText(profile.hairColor),
+      eyeColor: normalizeShortText(profile.eyeColor),
+      city: normalizeShortText(profile.city ?? place.city),
+      neighborhood: normalizeShortText(profile.neighborhood ?? place.neighborhood),
       likes: normalizeTagList(profile.likes),
       dislikes: normalizeTagList(profile.dislikes),
-      job: normalizeShortText(profile.job, JOB_TEXT_MAX),
-      education: normalizeShortText(profile.education, JOB_TEXT_MAX),
+      hobbies,
     };
     const botName = normalizeShortText(body.botName, BOT_NAME_MAX);
     const preferredAction = normalizePreferredAction(body.preferredAction);
@@ -144,7 +148,7 @@ export function createApp(deps: AppDeps) {
         maxTravelKm: prefs.maxTravelKm,
         dealbreakers: prefs.dealbreakers ?? [],
         lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
-        interests: prefs.interests ?? [],
+        interests: hobbies.length ? hobbies : prefs.interests ?? [],
       });
     } catch {
       await store.createPrefs({
@@ -154,7 +158,7 @@ export function createApp(deps: AppDeps) {
         maxTravelKm: prefs.maxTravelKm,
         dealbreakers: prefs.dealbreakers ?? [],
         lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
-        interests: prefs.interests ?? [],
+        interests: hobbies.length ? hobbies : prefs.interests ?? [],
       });
     }
 
@@ -190,23 +194,32 @@ export function createApp(deps: AppDeps) {
         height: body.profile?.height !== undefined ? normalizeShortText(body.profile.height) : undefined,
         hairColor:
           body.profile?.hairColor !== undefined ? normalizeShortText(body.profile.hairColor) : undefined,
+        eyeColor:
+          body.profile?.eyeColor !== undefined ? normalizeShortText(body.profile.eyeColor) : undefined,
+        city: body.profile?.city !== undefined ? normalizeShortText(body.profile.city) : undefined,
+        neighborhood:
+          body.profile?.neighborhood !== undefined
+            ? normalizeShortText(body.profile.neighborhood)
+            : undefined,
         likes: body.profile?.likes !== undefined ? normalizeTagList(body.profile.likes) : undefined,
         dislikes: body.profile?.dislikes !== undefined ? normalizeTagList(body.profile.dislikes) : undefined,
-        job: body.profile?.job !== undefined ? normalizeShortText(body.profile.job, JOB_TEXT_MAX) : undefined,
-        education:
-          body.profile?.education !== undefined
-            ? normalizeShortText(body.profile.education, JOB_TEXT_MAX)
-            : undefined,
+        hobbies: body.profile?.hobbies !== undefined ? normalizeTagList(body.profile.hobbies) : undefined,
       });
     }
-    if (body.prefs) {
+    if (body.profile?.city || body.profile?.neighborhood) {
+      const place = geoForPlace(body.profile.city, body.profile.neighborhood);
+      await store.updateUser(userId, { homeLat: place.lat, homeLng: place.lng });
+    }
+    if (body.prefs || body.profile?.hobbies) {
+      const hobbies =
+        body.profile?.hobbies !== undefined ? normalizeTagList(body.profile.hobbies) : undefined;
       await store.updatePrefs(userId, {
-        cuisine: body.prefs.cuisine,
-        budget: body.prefs.budget,
-        maxTravelKm: body.prefs.maxTravelKm,
-        dealbreakers: body.prefs.dealbreakers,
-        lookingFor: body.prefs.lookingFor,
-        interests: body.prefs.interests,
+        cuisine: body.prefs?.cuisine,
+        budget: body.prefs?.budget,
+        maxTravelKm: body.prefs?.maxTravelKm,
+        dealbreakers: body.prefs?.dealbreakers,
+        lookingFor: body.prefs?.lookingFor,
+        interests: hobbies ?? body.prefs?.interests,
       });
     }
     return c.json(await toUserDto(store, userId));

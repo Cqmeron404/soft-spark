@@ -285,12 +285,23 @@ async function main() {
     height?: string;
     likes?: string[];
     hairColor?: string;
+    eyeColor?: string;
+    city?: string;
+    neighborhood?: string;
+    hobbies?: string[];
   }>(await app.request("/users/me", { headers: { cookie: mayaAuth.cookie } }));
   if (mayaProfile.photoUrl !== MAYA.photoUrl) failures.push("onboard did not persist photoUrl");
   else console.log("ok  onboard Maya + Jordan (User + DatingBot + photoUrl)");
-  if (mayaProfile.height !== MAYA.profile.height || !mayaProfile.likes?.includes("pasta")) {
-    failures.push(`onboard did not persist rich profile: ${JSON.stringify(mayaProfile)}`);
-  } else console.log("ok  onboard persisted height / likes / dating-profile fields");
+  if (
+    mayaProfile.height !== MAYA.profile.height ||
+    !mayaProfile.likes?.includes("pasta") ||
+    mayaProfile.eyeColor !== "brown" ||
+    mayaProfile.city !== "Denver" ||
+    mayaProfile.neighborhood !== "Capitol Hill" ||
+    !mayaProfile.hobbies?.includes("hiking")
+  ) {
+    failures.push(`onboard did not persist Edgar v1 profile: ${JSON.stringify(mayaProfile)}`);
+  } else console.log("ok  onboard persisted Edgar v1 fields (likes / hobbies / height / hair / eyes / city)");
 
   const mayaBot = await json<{
     displayName?: string;

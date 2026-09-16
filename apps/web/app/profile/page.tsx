@@ -9,7 +9,7 @@ import { ChipField } from "@/components/ChipField";
 import { PublishActions } from "@/components/PublishActions";
 import { getBot, getMe, patchMe } from "@/lib/api";
 import { getAuthSession } from "@/lib/auth";
-import { GENDER_OPTIONS, LOOKING_OPTIONS } from "@/lib/guest";
+import { CITY_NEIGHBORHOODS, GENDER_OPTIONS, LOOKING_OPTIONS } from "@/lib/guest";
 import { writeSession } from "@/lib/session";
 
 export default function ProfilePage() {
@@ -24,12 +24,13 @@ export default function ProfilePage() {
   const [bio, setBio] = useState("");
   const [height, setHeight] = useState("");
   const [hairColor, setHairColor] = useState("");
+  const [eyeColor, setEyeColor] = useState("");
+  const [city, setCity] = useState("Denver");
+  const [neighborhood, setNeighborhood] = useState("Capitol Hill");
   const [likes, setLikes] = useState<string[]>([]);
   const [dislikes, setDislikes] = useState<string[]>([]);
   const [hobbies, setHobbies] = useState<string[]>([]);
   const [lookingFor, setLookingFor] = useState("relationship");
-  const [job, setJob] = useState("");
-  const [education, setEducation] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,12 +44,13 @@ export default function ProfilePage() {
     setBio(user.bio ?? "");
     setHeight(user.height ?? "");
     setHairColor(user.hairColor ?? "");
+    setEyeColor(user.eyeColor ?? "");
+    setCity(user.city ?? "Denver");
+    setNeighborhood(user.neighborhood ?? "Capitol Hill");
     setLikes(user.likes ?? []);
     setDislikes(user.dislikes ?? []);
-    setHobbies(user.prefs.interests ?? []);
+    setHobbies(user.hobbies.length ? user.hobbies : user.prefs.interests ?? []);
     setLookingFor(user.prefs.lookingFor || "relationship");
-    setJob(user.job ?? "");
-    setEducation(user.education ?? "");
     setPhotoUrl(user.photoUrl);
   }
 
@@ -92,10 +94,12 @@ export default function ProfilePage() {
           bio,
           height,
           hairColor,
+          eyeColor,
+          city,
+          neighborhood,
           likes,
           dislikes,
-          job,
-          education,
+          hobbies,
         },
         prefs: { lookingFor, interests: hobbies },
       });
@@ -179,13 +183,29 @@ export default function ProfilePage() {
         <input value={hairColor} onChange={(e) => setHairColor(e.target.value)} placeholder="dark brown" />
       </label>
       <label style={{ display: "grid", gap: 6 }}>
-        Job
-        <input value={job} onChange={(e) => setJob(e.target.value)} />
+        Eye color
+        <input value={eyeColor} onChange={(e) => setEyeColor(e.target.value)} placeholder="brown" />
       </label>
       <label style={{ display: "grid", gap: 6 }}>
-        Education
-        <input value={education} onChange={(e) => setEducation(e.target.value)} />
+        City
+        <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Denver" />
       </label>
+      <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 8 }}>
+        <legend style={{ fontWeight: 600 }}>Neighborhood</legend>
+        <div className="ss-chip-row">
+          {CITY_NEIGHBORHOODS.filter((row) => row.city === city).map((row) => (
+            <button
+              key={row.neighborhood}
+              type="button"
+              className="ss-chip"
+              aria-pressed={neighborhood === row.neighborhood}
+              onClick={() => setNeighborhood(row.neighborhood)}
+            >
+              {row.neighborhood}
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <ChipField label="Likes" value={likes} presets={PROFILE_CHIP_PRESETS.likes} onChange={setLikes} />
       <ChipField label="Dislikes" value={dislikes} presets={PROFILE_CHIP_PRESETS.dislikes} onChange={setDislikes} />
       <ChipField label="Hobbies" value={hobbies} presets={PROFILE_CHIP_PRESETS.hobbies} onChange={setHobbies} />

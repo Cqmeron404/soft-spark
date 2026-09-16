@@ -7,7 +7,7 @@ import { PhotoCrop, SoftError } from "@soft-spark/ui";
 import { ChipField } from "@/components/ChipField";
 import { PublishActions } from "@/components/PublishActions";
 import { onboard } from "@/lib/api";
-import { DEFAULT_VIBES, DENVER_HOME, GENDER_OPTIONS, LOOKING_OPTIONS } from "@/lib/guest";
+import { CITY_NEIGHBORHOODS, DEFAULT_CITY, DEFAULT_VIBES, GENDER_OPTIONS, LOOKING_OPTIONS, geoForPlace } from "@/lib/guest";
 import { writeSession } from "@/lib/session";
 
 type Step = "bot" | "profile" | "publish";
@@ -23,12 +23,13 @@ export function OnboardWizard(props: { defaultName?: string }) {
   const [bio, setBio] = useState("");
   const [height, setHeight] = useState("");
   const [hairColor, setHairColor] = useState("");
+  const [eyeColor, setEyeColor] = useState("");
+  const [city, setCity] = useState<string>(DEFAULT_CITY.city);
+  const [neighborhood, setNeighborhood] = useState<string>(DEFAULT_CITY.neighborhood);
   const [likes, setLikes] = useState<string[]>([]);
   const [dislikes, setDislikes] = useState<string[]>([]);
   const [hobbies, setHobbies] = useState<string[]>([]);
   const [lookingFor, setLookingFor] = useState("relationship");
-  const [job, setJob] = useState("");
-  const [education, setEducation] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -63,10 +64,12 @@ export function OnboardWizard(props: { defaultName?: string }) {
           bio: bio.trim() || undefined,
           height: height.trim() || undefined,
           hairColor: hairColor.trim() || undefined,
+          eyeColor: eyeColor.trim() || undefined,
+          city,
+          neighborhood,
           likes,
           dislikes,
-          job: job.trim() || undefined,
-          education: education.trim() || undefined,
+          hobbies,
         },
         prefs: {
           cuisine: ["italian", "american"],
@@ -76,7 +79,7 @@ export function OnboardWizard(props: { defaultName?: string }) {
           lookingFor,
           interests: hobbies,
         },
-        homeGeo: { ...DENVER_HOME },
+        homeGeo: { lat: geoForPlace(city, neighborhood).lat, lng: geoForPlace(city, neighborhood).lng },
         homeTz: "America/Denver",
       };
       const res = await onboard(body);
@@ -228,13 +231,39 @@ export function OnboardWizard(props: { defaultName?: string }) {
         </datalist>
       </label>
       <label style={{ display: "grid", gap: 6 }}>
-        Job
-        <input value={job} onChange={(e) => setJob(e.target.value)} placeholder="product designer" />
+        Eye color
+        <input
+          value={eyeColor}
+          onChange={(e) => setEyeColor(e.target.value)}
+          placeholder="brown"
+          list="ss-eyes"
+        />
+        <datalist id="ss-eyes">
+          {PROFILE_CHIP_PRESETS.eyeColor.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
       </label>
       <label style={{ display: "grid", gap: 6 }}>
-        Education
-        <input value={education} onChange={(e) => setEducation(e.target.value)} placeholder="CU Boulder" />
+        City
+        <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Denver" />
       </label>
+      <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 8 }}>
+        <legend style={{ fontWeight: 600 }}>Neighborhood</legend>
+        <div className="ss-chip-row">
+          {CITY_NEIGHBORHOODS.filter((row) => row.city === city).map((row) => (
+            <button
+              key={row.neighborhood}
+              type="button"
+              className="ss-chip"
+              aria-pressed={neighborhood === row.neighborhood}
+              onClick={() => setNeighborhood(row.neighborhood)}
+            >
+              {row.neighborhood}
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <ChipField
         label="Likes"
         value={likes}
@@ -251,7 +280,6 @@ export function OnboardWizard(props: { defaultName?: string }) {
       />
       <ChipField
         label="Hobbies"
-        hint="Saved as interests for matching."
         value={hobbies}
         presets={PROFILE_CHIP_PRESETS.hobbies}
         onChange={setHobbies}

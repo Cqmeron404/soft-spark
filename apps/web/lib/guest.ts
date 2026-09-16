@@ -1,3 +1,5 @@
+export { CITY_NEIGHBORHOODS, DEFAULT_CITY, geoForPlace } from "@soft-spark/shared";
+
 /** Demo-style first-name signup — no email form required. */
 export function guestCredentials(firstName: string) {
   const slug = firstName.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 12) || "spark";

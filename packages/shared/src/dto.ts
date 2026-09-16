@@ -87,10 +87,12 @@ export type UserDto = {
   photoUrl?: string;
   height?: string;
   hairColor?: string;
+  eyeColor?: string;
+  city?: string;
+  neighborhood?: string;
   likes: string[];
   dislikes: string[];
-  job?: string;
-  education?: string;
+  hobbies: string[];
   homeGeo: Geo;
   homeTz: string;
   prefs: {
@@ -99,7 +101,7 @@ export type UserDto = {
     maxTravelKm: number;
     dealbreakers: string[];
     lookingFor: string;
-    /** Shown as hobbies in the dating-profile UI. */
+    /** Mirror of hobbies for the existing match-engine snapshot. */
     interests: string[];
   };
 };
@@ -114,10 +116,12 @@ export type OnboardBody = {
     bio?: string;
     height?: string;
     hairColor?: string;
+    eyeColor?: string;
+    city?: string;
+    neighborhood?: string;
     likes?: string[];
     dislikes?: string[];
-    job?: string;
-    education?: string;
+    hobbies?: string[];
   };
   prefs: {
     cuisine: string[];

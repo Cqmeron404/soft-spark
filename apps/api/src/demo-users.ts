@@ -139,8 +139,8 @@ async function ensureOnboarded(
 ): Promise<{ id: string; displayName: string }> {
   const me = await app.request("/users/me", { headers });
   if (me.status === 200) {
-    const current = await json<{ id: string; displayName: string; height?: string }>(me);
-    if (!current.height) {
+    const current = await json<{ id: string; displayName: string; height?: string; eyeColor?: string }>(me);
+    if (!current.height || !current.eyeColor) {
       await app.request("/users/me", {
         method: "PATCH",
         headers,

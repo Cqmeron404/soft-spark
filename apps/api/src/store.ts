@@ -40,8 +40,12 @@ export type UserRecord = {
   status: string;
   height?: string;
   hairColor?: string;
+  eyeColor?: string;
+  city?: string;
+  neighborhood?: string;
   likes: string[];
   dislikes: string[];
+  hobbies: string[];
   job?: string;
   education?: string;
   createdAt: string;
@@ -184,8 +188,12 @@ function asUser(row: typeof users.$inferSelect): UserRecord {
     status: row.status,
     height: row.height ?? undefined,
     hairColor: row.hairColor ?? undefined,
+    eyeColor: row.eyeColor ?? undefined,
+    city: row.city ?? undefined,
+    neighborhood: row.neighborhood ?? undefined,
     likes: row.likes ?? [],
     dislikes: row.dislikes ?? [],
+    hobbies: row.hobbies ?? [],
     job: row.job ?? undefined,
     education: row.education ?? undefined,
     createdAt: iso(row.createdAt),
@@ -319,8 +327,12 @@ export function createDbStore(db: SparkDb) {
           botDatingOptIn: input.botDatingOptIn,
           height: input.height,
           hairColor: input.hairColor,
+          eyeColor: input.eyeColor,
+          city: input.city,
+          neighborhood: input.neighborhood,
           likes: input.likes ?? [],
           dislikes: input.dislikes ?? [],
+          hobbies: input.hobbies ?? [],
           job: input.job,
           education: input.education,
         })
@@ -343,8 +355,12 @@ export function createDbStore(db: SparkDb) {
             homeTz: patch.homeTz,
             height: patch.height,
             hairColor: patch.hairColor,
+            eyeColor: patch.eyeColor,
+            city: patch.city,
+            neighborhood: patch.neighborhood,
             likes: patch.likes,
             dislikes: patch.dislikes,
+            hobbies: patch.hobbies,
             job: patch.job,
             education: patch.education,
             updatedAt: new Date(),
