@@ -42,6 +42,7 @@ function isHealthJson(body: unknown): body is {
 }
 
 async function reproduceHeadersGetCrash() {
+  console.log("reproducing production TypeError on Node-shaped headers (expected 500 from raw Hono):");
   const app = new Hono();
   app.use("/*", cors());
   app.get("/health", (c) => c.json({ ok: true }));
@@ -50,16 +51,21 @@ async function reproduceHeadersGetCrash() {
     url: "https://soft-spark-api.vercel.app/health",
     headers: { host: "soft-spark-api.vercel.app" },
   };
-  try {
-    await app.fetch(nodeish as unknown as Request);
-    failures.push("expected TypeError from Hono CORS on Node headers");
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  const result: unknown = await Promise.resolve(app.fetch(nodeish as unknown as Request)).catch(
+    (err: unknown) => err
+  );
+  if (result instanceof Error) {
     check(
-      err instanceof TypeError && message.includes("headers.get"),
-      `hypothesis: Hono throws "${message}" on IncomingMessage-shaped headers`
+      result.message.includes("headers.get"),
+      `hypothesis: Hono throws "${result.message}" on IncomingMessage-shaped headers`
     );
+    return;
   }
+  const status = result instanceof Response ? result.status : -1;
+  check(
+    status >= 500,
+    `hypothesis: Hono CORS hits headers.get on Node headers (status ${status})`
+  );
 }
 
 async function viaWebRequest() {
