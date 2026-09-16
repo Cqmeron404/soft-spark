@@ -1,0 +1,56 @@
+:root {
+  --ss-bg: #f7f1ea;
+  --ss-surface: #fff8f2;
+  --ss-surface-elevated: #ffffff;
+  --ss-text: #2a211c;
+  --ss-text-muted: #7a6e66;
+  --ss-border: #e8dfd6;
+  --ss-accent: #e8a598;
+  --ss-accent-soft: #f0c4a8;
+  --ss-danger: #b85c4e;
+  --ss-success: #5c8a6e;
+  --ss-radius-card: 20px;
+  --ss-radius-chip: 999px;
+  --ss-radius-button: 14px;
+  --ss-font-ui: Inter, "SF Pro Text", system-ui, sans-serif;
+  --ss-font-display: Fraunces, Georgia, "Times New Roman", serif;
+}
+
+.ss-page {
+  min-height: 100vh;
+  background: var(--ss-bg);
+  color: var(--ss-text);
+  font-family: var(--ss-font-ui);
+}
+
+.ss-card {
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-border);
+  border-radius: var(--ss-radius-card);
+  padding: 18px;
+}
+
+.ss-btn {
+  min-height: 44px;
+  border-radius: var(--ss-radius-button);
+  padding: 0 18px;
+  font: 600 16px/1 var(--ss-font-ui);
+  cursor: pointer;
+  border: none;
+}
+
+.ss-btn-primary {
+  background: var(--ss-accent);
+  color: var(--ss-text);
+}
+
+.ss-btn-ghost {
+  background: transparent;
+  color: var(--ss-text);
+}
+
+.ss-btn-danger {
+  background: transparent;
+  color: var(--ss-danger);
+  border: 1px solid var(--ss-danger);
+}

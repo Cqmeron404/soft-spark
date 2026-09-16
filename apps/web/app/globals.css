@@ -1,0 +1,38 @@
+:root {
+  --ss-font-ui: var(--font-inter), Inter, "SF Pro Text", system-ui, sans-serif;
+  --ss-font-display: var(--font-fraunces), Fraunces, Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--ss-bg);
+  color: var(--ss-text);
+  font-family: var(--ss-font-ui);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+input,
+select,
+textarea {
+  min-height: 44px;
+  border: 1px solid var(--ss-border);
+  border-radius: 14px;
+  padding: 0 12px;
+  background: var(--ss-surface);
+  color: var(--ss-text);
+}
