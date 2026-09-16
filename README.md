@@ -54,7 +54,7 @@ Live deploy needs **host secrets**. This repo does **not** invent credentials. W
 | Surface | Config | Notes |
 |---------|--------|--------|
 | Web | `apps/web/vercel.json` + root `vercel.json` | Vercel project Root Directory = `apps/web` (or deploy from repo root). Set `NEXT_PUBLIC_API_URL`. |
-| API | `apps/api/vercel.json` + `apps/api/Dockerfile` | Vercel Root Directory = `apps/api`, Framework **Other** (`framework: null`). Serverless entry is committed `apps/api/api/index.ts` — `functions` must glob that source file (a generated `api/index.js` will fail the build). `installCommand` / `buildCommand` still run from the **repo root** so workspace packages emit `dist/` JS. `maxDuration` 60s (SSE degraded). Docker is preferred for long-lived Node. |
+| API | `apps/api/vercel.json` + `apps/api/Dockerfile` | Vercel Root Directory = `apps/api`, Framework **Other** (`framework: null`). Serverless entry is committed `apps/api/api/index.ts` — `functions` must glob that source file (a generated `api/index.js` will fail the build). The Hobby runtime is **Node (req, res)**; the gateway converts IncomingMessage headers into a Web `Request` (`headers.get`) and answers `GET /health` without waiting on Postgres. `installCommand` / `buildCommand` still run from the **repo root** so workspace packages emit `dist/` JS. `maxDuration` 60s (SSE degraded). Docker is preferred for long-lived Node. |
 | Checklist | `bash scripts/deploy.sh check` | Prints which required vars are missing (values never printed). |
 | VAPID | `bash scripts/deploy.sh vapid` | `npx web-push generate-vapid-keys` — do not commit keys. |
 
