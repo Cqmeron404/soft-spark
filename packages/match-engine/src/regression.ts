@@ -1,12 +1,21 @@
 /**
- * Slice 3 safety / soak set — persona turns must not drift invite_threshold 0.75.
+ * Slice 3 Nexus soak + safety/regression set.
+ * Persona turns must not drift invite_threshold 0.75.
  * Clients never see confidence / transcripts / messages[].
  */
 import { chemistryFromTranscript } from "./chemistry-from-transcript";
-import { CONSTANTS, canEnterInviteReady, scoreMatch } from "./logic";
-import { createLlmConversationRunner } from "./llm";
+import { passesHardFilter } from "./hard-filter";
+import {
+  CONSTANTS,
+  canEnterInviteReady,
+  earlyExitLowFit,
+  profileFit,
+  safetyCheckMessage,
+  scoreMatch,
+} from "./logic";
+import { createLlmConversationRunner, resolveMatchEngineMode } from "./llm";
 import { buildBotTurnPrompt } from "./llm-conversation-runner";
-import { createStubConversationRunner } from "./stubs";
+import { createStubConversationRunner, HAPPY_PATH_DIMS } from "./stubs";
 import type { BotTurnInput, ScoreResult, UserProfileSnapshot } from "./types";
 import { assertPlacesKeyInProd } from "./venue-provider";
 
@@ -51,6 +60,15 @@ function turnInput(profile: UserProfileSnapshot, history: BotTurnInput["history"
 }
 
 export async function overlappingPersonaScore(): Promise<ScoreResult> {
+  const { score } = await overlappingPersonaTranscript();
+  return score;
+}
+
+export async function overlappingPersonaTranscript(): Promise<{
+  score: ScoreResult;
+  dims: ReturnType<typeof chemistryFromTranscript>;
+  history: Array<{ role: "botA" | "botB"; text: string }>;
+}> {
   const runner = createStubConversationRunner();
   const history: BotTurnInput["history"] = [];
   for (let i = 0; i < CONSTANTS.MAX_TURNS; i++) {
@@ -63,13 +81,14 @@ export async function overlappingPersonaScore(): Promise<ScoreResult> {
     });
   }
   const dims = chemistryFromTranscript(history.map((m) => ({ role: m.role, text: m.text })));
-  return scoreMatch({
+  const score = scoreMatch({
     matchId: "soak",
     a: MAYA,
     b: JORDAN,
     chemistryDims: dims,
     safetyOk: true,
   });
+  return { score, dims, history: history.map((m) => ({ role: m.role, text: m.text })) };
 }
 
 export async function runInviteThresholdRegression(): Promise<string[]> {
@@ -97,12 +116,52 @@ export async function runInviteThresholdRegression(): Promise<string[]> {
     failures.push("0.75 with 0 venues must emit match.venue_unavailable");
   }
 
-  const scored = await overlappingPersonaScore();
+  const { score: scored, dims: liveDims } = await overlappingPersonaTranscript();
   if (scored.confidence < CONSTANTS.INVITE_THRESHOLD) {
     failures.push(
       `persona turns drifted below 0.75 (confidence=${scored.confidence.toFixed(3)}). Threshold must stay 0.75.`
     );
   }
+  if (JSON.stringify(liveDims) === JSON.stringify(HAPPY_PATH_DIMS)) {
+    failures.push("live chemistry dims must come from transcript, not forced HAPPY_PATH_DIMS");
+  }
+
+  const casualJordan: UserProfileSnapshot = { ...JORDAN, looking_for: "casual" };
+  if (!passesHardFilter(MAYA, casualJordan)) {
+    failures.push("intent mismatch must not hard-filter (soft penalty only)");
+  }
+  const mismatch = profileFit(MAYA, casualJordan);
+  if (!mismatch.reasons.includes("intent_mismatch")) {
+    failures.push("relationship vs casual should emit intent_mismatch");
+  }
+
+  const safetyCases: Array<{ code: "harassment" | "sexual_pressure" | "pii_dump"; text: string }> = [
+    { code: "harassment", text: "you stupid bitch" },
+    { code: "sexual_pressure", text: "send nudes" },
+    { code: "pii_dump", text: "my address is 123 Main" },
+  ];
+  for (const row of safetyCases) {
+    const hit = safetyCheckMessage(row.text);
+    if (hit.ok || hit.code !== row.code) {
+      failures.push(`safetyCheckMessage missed ${row.code}`);
+    }
+  }
+
+  if (!earlyExitLowFit(4, 0.2, 0.2)) failures.push("turn 4 + weak chemistry/profileFit must early-exit");
+  if (earlyExitLowFit(3, 0.2, 0.2)) failures.push("early exit must wait until turn 4");
+  if (earlyExitLowFit(4, 0.5, 0.2)) failures.push("early exit must not fire when chemistry is healthy");
+
+  const win = CONSTANTS.INVITE_WINDOW;
+  if (win.localStart !== "18:00" || win.localEnd !== "20:00" || win.days.join() !== "Fri,Sat,Sun") {
+    failures.push("invite window drifted from Fri–Sun 18:00–20:00");
+  }
+
+  const rollback = resolveMatchEngineMode({ MATCH_ENGINE_MODE: "stub", OPENAI_API_KEY: "sk-should-not-use" });
+  if (rollback.usedLlm) failures.push("MATCH_ENGINE_MODE=stub must ignore OPENAI_API_KEY (rollback)");
+  const noKey = resolveMatchEngineMode({ MATCH_ENGINE_MODE: "llm" });
+  if (noKey.usedLlm || !noKey.log) failures.push("llm without key must force stub + log");
+  const liveLlm = resolveMatchEngineMode({ MATCH_ENGINE_MODE: "llm", OPENAI_API_KEY: "sk-test" });
+  if (!liveLlm.usedLlm) failures.push("llm + key should select LLM runner");
 
   const prompt = buildBotTurnPrompt({
     matchId: "p",

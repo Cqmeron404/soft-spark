@@ -25,10 +25,17 @@ pnpm typecheck
 pnpm build
 pnpm seed    # local/demo Denver catalog only (blocked when NODE_ENV=production)
 pnpm demo
-pnpm test    # invite_threshold soak + demo
+pnpm soak    # alias of demo; stub by default
+pnpm test    # invite_threshold 0.75 soak + demo
 ```
 
-`pnpm demo` signs up two Denver users (Maya, Jordan) via Better Auth, onboards (photoUrl), runs hard-filter → persona bot turns → transcript-derived chemistry → midpoint venues → dual accept, and asserts **booked**. It also checks prod boot/Places guards, 401s, paused bots, client payloads without `confidence` / transcripts / `messages[]`, `match.venue_unavailable` keeping `exploring`, realtime + push registration, DualStatusRow copy, LLM stub fallback, and restart survival.
+`pnpm demo` (and `pnpm soak`) signs up two Denver users (Maya, Jordan) via Better Auth, onboards (photoUrl), runs hard-filter → persona bot turns → transcript-derived chemistry → midpoint venues → dual accept, and asserts **booked**. It also checks prod boot/Places guards, 401s, paused bots (one + both), client payloads without `confidence` / transcripts / `messages[]`, `match.venue_unavailable` keeping `exploring`, intent soft mismatch, safety inject → `match.safety_failed`, early `low_fit_early_exit`, rollback `MATCH_ENGINE_MODE=stub`, LLM down stub fallback, DualStatusRow copy, and restart survival.
+
+Persona turns must still clear **invite_threshold 0.75** — the threshold is frozen; do not lower it if soak dips.
+
+**Rollback:** `MATCH_ENGINE_MODE=stub` — no code change. Stub is used even if `OPENAI_API_KEY` is set. LLM empty/error still stub-falls back when mode is `llm`.
+
+**Live LLM soak (optional):** `MATCH_ENGINE_MODE=llm pnpm soak` when `OPENAI_API_KEY` is present. CI skips live completions if the key is missing (no secret invented).
 
 ### HTTP demo
 
@@ -70,7 +77,7 @@ Push (status-only A; stubbed until set):
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — same public key for the browser
 - `EXPO_ACCESS_TOKEN` — optional Expo push auth
 
-LLM soak (optional; stub fallback if missing):
+LLM soak (optional; stub fallback if missing). **Rollback = `MATCH_ENGINE_MODE=stub`** (no code change; ignores a present key):
 
 - `MATCH_ENGINE_MODE=llm`
 - `OPENAI_API_KEY`
@@ -91,7 +98,7 @@ Copy `.env.example` locally. Set the same names in Vercel / Fly / Render dashboa
 | `AUTH_MODE` | no | `prod` disables `x-user-id` bypass (also off when `NODE_ENV=production`). |
 | `WEB_ORIGIN` | prod | CORS / Better Auth trusted origin, default `http://localhost:3000`. |
 | `GOOGLE_PLACES_API_KEY` | **prod VenueSuggester** | Nearby search. Local/demo uses seeded Denver catalog. 0 results → `exploring` + `match.venue_unavailable`. |
-| `MATCH_ENGINE_MODE` | no | `stub` (default) or `llm`. Without `OPENAI_API_KEY`, LLM mode **stub-falls back**. |
+| `MATCH_ENGINE_MODE` | always | `stub` (default / **rollback**) or `llm`. Stub never calls OpenAI even if a key is set. Mode=`llm` without `OPENAI_API_KEY` forces stub + log. |
 | `OPENAI_API_KEY` | llm | Chat Completions for `ConversationRunner` + optional chemistry judge. |
 | `OPENAI_BASE_URL` / `OPENAI_MODEL` | no | OpenAI-compatible override. |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | web push | Status-only payloads (`invite.sent`, `invite_ready`, `invite.accepted\|declined`, band updates). No transcripts. |
@@ -139,3 +146,22 @@ Protected routes (`/users/me/*`, `/matches*`, `/realtime/*`) require a Better Au
 6. Safety fail → archive + `match.safety_failed`
 
 Event names match `forge-contract-v0.md`. Scoring weights stay `0.35 / 0.45 / 0.20`. `invite_threshold = 0.75`.
+
+## LLM soak + regression (Nexus checklist)
+
+`pnpm soak` / `pnpm demo` on **stub** (default). `MATCH_ENGINE_MODE=llm pnpm soak` when a key is present; CI skips live completions without inventing one.
+
+| Scenario | Assert |
+|----------|--------|
+| Happy path | Overlapping Denver profiles → `invited`/`booked`; ≤2 snake_case reasons; **no** client `confidence` / `messages[]` / transcript |
+| Intent soft mismatch | relationship vs casual still possible; `intent_mismatch` may appear; not a hard filter |
+| `venue_unavailable` | score ≥0.75 but 0 places → stay `exploring` + `match.venue_unavailable` |
+| Safety fail | inject harassment / sexual_pressure / pii_dump → `match.safety_failed` + archived; no invite |
+| Paused bot | one paused → other can turn; both paused → stop |
+| LLM down | mode=`llm` with bad key → phase/persona fallback + safety check; match does not crash |
+| Early low-fit | weak chemistry+profileFit after turn 4 → archive `low_fit_early_exit` |
+| Rollback | `MATCH_ENGINE_MODE=stub` never calls OpenAI even if `OPENAI_API_KEY` is set |
+
+Regression gates: client DTOs are state + band + reasons + invite only; internal events still include turn text; `canEnterInviteReady` requires ≥1 venue; invite window Fri–Sun 18:00–20:00; chemistry from transcript (not forced `HAPPY_PATH_DIMS`); safety gate before persist on every turn; persona turns must not drift `invite_threshold` 0.75.
+
+Spike in safety_fail or fallback after deploy → stay on stub.

@@ -7,6 +7,7 @@ import { runInviteThresholdRegression } from "@soft-spark/match-engine";
 import { createApp } from "./app.js";
 import { bootstrap } from "./bootstrap.js";
 import { bootMissing, placesMissing } from "./env.js";
+import { runNexusSoakScenarios } from "./nexus-soak.js";
 import { createEngine, orchestrateMatch } from "./orchestrate.js";
 
 const MAYA = {
@@ -385,38 +386,12 @@ async function main() {
   if (!health.env) failures.push("health missing env flags");
   else console.log("ok  /health reports env flags without secrets");
 
-  const prevMode = process.env.MATCH_ENGINE_MODE;
-  const prevKey = process.env.OPENAI_API_KEY;
-  process.env.MATCH_ENGINE_MODE = "llm";
-  delete process.env.OPENAI_API_KEY;
-  const llmAuthA = await signUp(app, { email: "llm-a@softspark.dev", password: "spark-demo-llm", name: "LlmA" });
-  const llmAuthB = await signUp(app, { email: "llm-b@softspark.dev", password: "spark-demo-llm", name: "LlmB" });
-  const llmA = await json<OnboardRes>(
-    await app.request("/users/me/onboard", {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie: llmAuthA.cookie },
-      body: JSON.stringify({ ...MAYA, profile: { ...MAYA.profile, displayName: "LlmA" } }),
-    })
-  );
-  const llmB = await json<OnboardRes>(
-    await app.request("/users/me/onboard", {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie: llmAuthB.cookie },
-      body: JSON.stringify({ ...JORDAN, profile: { ...JORDAN.profile, displayName: "LlmB" } }),
-    })
-  );
-  const llmMatch = await orchestrateMatch({
+  await runNexusSoakScenarios({
+    app,
     store: ctx.store,
     events: ctx.events,
-    engine: await createEngine(ctx.store),
-    userAId: llmA.user.id,
-    userBId: llmB.user.id,
+    failures,
   });
-  if (llmMatch.state !== "invited") {
-    failures.push(`llm soak without key should stub-fallback to invited, got ${llmMatch.state}`);
-  } else console.log("ok  MATCH_ENGINE_MODE=llm without OPENAI_API_KEY → stub fallback → invited");
-  process.env.MATCH_ENGINE_MODE = prevMode;
-  if (prevKey) process.env.OPENAI_API_KEY = prevKey;
 
   await ctx.close();
 

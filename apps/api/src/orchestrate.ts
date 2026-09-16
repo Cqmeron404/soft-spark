@@ -14,10 +14,12 @@ import {
   llmConfigured,
   passesHardFilter,
   profileFit,
+  resolveMatchEngineMode,
   type MatchScorer,
   type ConversationRunner,
   type SafetyGate,
   type VenueSuggester,
+  type ChemistryDims,
 } from "@soft-spark/match-engine";
 import { EVENTS, isClientPushType, isHomeCardReason, type ClientRealtimeEvent } from "@soft-spark/shared";
 import type { EventLog } from "./event-log.js";
@@ -33,6 +35,10 @@ export type Engine = {
   runner: ConversationRunner;
   safety: SafetyGate;
   venues: VenueSuggester;
+  /** Soak/test hook: override transcript dims (live path uses chemistryFromTranscript). */
+  chemistryFromHistory?: (
+    history: Array<{ role: string; text: string }>
+  ) => ChemistryDims | Promise<ChemistryDims>;
 };
 
 export async function createEngine(
@@ -40,21 +46,21 @@ export async function createEngine(
   options?: { emptyVenues?: boolean }
 ): Promise<Engine> {
   const stubRunner = createStubConversationRunner();
-  const modeLlm = process.env.MATCH_ENGINE_MODE === "llm";
-  const runner =
-    modeLlm && llmConfigured({
-      MATCH_ENGINE_MODE: process.env.MATCH_ENGINE_MODE,
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    })
-      ? createLlmConversationRunner(
-          {
-            apiKey: process.env.OPENAI_API_KEY,
-            baseUrl: process.env.OPENAI_BASE_URL,
-            model: process.env.OPENAI_MODEL,
-          },
-          stubRunner
-        )
-      : stubRunner;
+  const resolved = resolveMatchEngineMode({
+    MATCH_ENGINE_MODE: process.env.MATCH_ENGINE_MODE,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  });
+  if (resolved.log) console.warn(`[match-engine] ${resolved.log}`);
+  const runner = resolved.usedLlm
+    ? createLlmConversationRunner(
+        {
+          apiKey: process.env.OPENAI_API_KEY,
+          baseUrl: process.env.OPENAI_BASE_URL,
+          model: process.env.OPENAI_MODEL,
+        },
+        stubRunner
+      )
+    : stubRunner;
   const catalog = isProduction() ? [] : await store.listCatalog();
   const googleKey = process.env.GOOGLE_PLACES_API_KEY;
   assertPlacesInProd(process.env, { emptyVenues: options?.emptyVenues });
@@ -239,7 +245,11 @@ export async function orchestrateMatch(input: {
       text: m.text,
     }));
     const heuristic = chemistryFromTranscript(transcript);
-    const dims = judge ? await judge(transcript, heuristic) : heuristic;
+    const dims = engine.chemistryFromHistory
+      ? await engine.chemistryFromHistory(transcript)
+      : judge
+        ? await judge(transcript, heuristic)
+        : heuristic;
     match = await store.updateMatch(match.id, { chemistryDims: dims });
     const pf = profileFit(a, b).value;
     const chemistry =
