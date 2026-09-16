@@ -32,22 +32,20 @@ export function SoftToast(props: { message: string; action?: string; onAction?: 
   );
 }
 
-/** Aura can drop SVG/PNG into /brand/logo.svg and /brand/logo.png — this slot does not block eng. */
-export function BrandMark({ href = "/matches" }: { href?: string }) {
+export function EmptyState(props: { title: string; body?: string }) {
   return (
-    <a href={href} style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "inherit", textDecoration: "none" }}>
-      <img
-        src="/brand/logo.svg"
-        alt=""
-        width={28}
-        height={28}
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).style.display = "none";
-        }}
-        style={{ borderRadius: 8 }}
-      />
-      <span style={{ fontFamily: "var(--ss-font-display)", fontWeight: 600, fontSize: 18 }}>Soft spark</span>
-    </a>
+    <div className="ss-card" style={{ display: "grid", gap: 8 }}>
+      <p style={{ margin: 0, fontWeight: 600 }}>{props.title}</p>
+      {props.body ? <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>{props.body}</p> : null}
+    </div>
+  );
+}
+
+export function SoftError({ children }: { children: string }) {
+  return (
+    <p className="ss-error" role="alert">
+      {children}
+    </p>
   );
 }
 

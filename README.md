@@ -42,7 +42,9 @@ Web (API must be running):
 pnpm dev:web          # http://localhost:3000
 ```
 
-Signed-out → `/signin`. Signed-in without a dating profile → `/onboard`. Else `/matches`. Optional Partykit: `pnpm dev:realtime` then set `PARTYKIT_HOST`.
+Signed-out → marketing `/` then `/auth/sign-in` or `/auth/sign-up`. Signed-in without a dating profile → `/onboard`. Else `/matches`. Optional Partykit: `pnpm dev:realtime` then set `PARTYKIT_HOST`.
+
+Logo (Ember, locked): `apps/web/public/brand/` and `apps/mobile/assets/brand/`. Chrome uses the Ember mark + **Soft Spark** wordmark. Tagline: **Your bot dates. You show up.**
 
 ## Env vars
 
@@ -63,7 +65,7 @@ Signed-out → `/signin`. Signed-in without a dating profile → `/onboard`. Els
 | `NEXT_PUBLIC_API_URL` | no | Web, default `http://localhost:8787`. |
 | `EXPO_PUBLIC_API_URL` | no | Expo, default `http://localhost:8787`. |
 
-Copy to `.env` locally (gitignored). Logo SVG/PNG slots: `apps/web/public/brand/` and `apps/mobile/assets/brand/` — Aura can replace files without blocking eng. Tokens: `packages/ui/src/tokens.ts`.
+Logo SVG/PNG (Ember): `apps/web/public/brand/` and `apps/mobile/assets/brand/`. Tokens: `packages/ui/src/tokens.ts`. `AppLogo` variants: `mark` · `wordmark` · `favicon`.
 
 ## API
 

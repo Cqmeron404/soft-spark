@@ -73,7 +73,7 @@ export default function OnboardPage() {
   useEffect(() => {
     void getAuthSession().then((data) => {
       if (!data?.user) {
-        router.replace("/signin");
+        router.replace("/auth/sign-in");
         return;
       }
       if (!name) setName(data.user.name ?? "");

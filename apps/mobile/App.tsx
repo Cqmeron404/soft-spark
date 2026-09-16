@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -72,13 +73,18 @@ export default function App() {
     <ScrollView contentContainerStyle={styles.page}>
       <StatusBar style="dark" />
       <View style={styles.brandRow}>
-        <View style={styles.logoSlot} />
-        <Text style={styles.brand}>Soft spark</Text>
+        <Image
+          source={require("./assets/brand/png/soft-spark-mark-128.png")}
+          style={styles.mark}
+          accessibilityLabel="Soft Spark"
+        />
+        <Text style={styles.brand}>Soft Spark</Text>
       </View>
 
       {screen === "signin" ? (
         <View style={styles.stack}>
           <Text style={styles.h1}>Welcome back</Text>
+          <Text style={styles.muted}>Your bot dates. You show up.</Text>
           <Field label="Email" value={email} onChange={setEmail} />
           <Field label="Password" value={password} onChange={setPassword} secure />
           {error ? <Text style={styles.err}>{error}</Text> : null}
@@ -102,7 +108,8 @@ export default function App() {
 
       {screen === "signup" ? (
         <View style={styles.stack}>
-          <Text style={styles.h1}>Join Soft spark</Text>
+          <Text style={styles.h1}>Join Soft Spark</Text>
+          <Text style={styles.muted}>Your bot dates. You show up.</Text>
           <Field label="Name" value={name} onChange={setName} />
           <Field label="Email" value={email} onChange={setEmail} />
           <Field label="Password" value={password} onChange={setPassword} secure />
@@ -296,18 +303,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
-  logoSlot: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: ACCENT,
-  },
-  brand: { fontSize: 28, fontWeight: "600", color: TEXT, fontFamily: "Georgia" },
+  mark: { width: 24, height: 24, borderRadius: 6 },
+  brand: { fontSize: 22, fontWeight: "600", color: TEXT, fontFamily: "Georgia" },
   stack: { gap: 12 },
   h1: { fontSize: 28, fontWeight: "600", color: TEXT, fontFamily: "Georgia" },
   body: { color: TEXT, fontSize: 16 },
   muted: { color: MUTED },
-  err: { color: "#B85C4E" },
+  err: { color: TEXT, backgroundColor: "#F0C4A8", padding: 12, borderRadius: 14, overflow: "hidden" },
   link: { color: TEXT, fontWeight: "600", textDecorationLine: "underline" },
   label: { color: MUTED, marginBottom: 6 },
   input: {

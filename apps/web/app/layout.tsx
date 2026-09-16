@@ -8,8 +8,12 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces" });
 
 export const metadata: Metadata = {
-  title: "Soft spark",
-  description: "Your bot dates. You show up for the invite.",
+  title: "Soft Spark",
+  description: "Your bot dates. You show up.",
+  icons: {
+    icon: [{ url: "/brand/svg/soft-spark-favicon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/brand/png/soft-spark-favicon-180.png" }],
+  },
 };
 
 export default function RootLayout({

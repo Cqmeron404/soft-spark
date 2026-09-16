@@ -17,7 +17,7 @@ export default function InvitePage() {
   async function load() {
     const session = readSession();
     if (!session) {
-      router.replace("/signin");
+      router.replace("/auth/sign-in");
       return;
     }
     setMatch(await getMatch(params.id));
@@ -42,7 +42,7 @@ export default function InvitePage() {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <ConnectingCaption live={live} />
-      {error ? <p style={{ color: "var(--ss-danger)" }}>{error}</p> : null}
+      {error ? <p className="ss-error">{error}</p> : null}
       <InviteCard
         venueName={match.invite.venue.name}
         cuisine={match.invite.venue.cuisine}

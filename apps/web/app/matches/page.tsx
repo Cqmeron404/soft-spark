@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ClientRealtimeEvent, MatchListItem } from "@soft-spark/shared";
-import { ConnectingCaption, MatchCard, SoftToast } from "@soft-spark/ui";
+import { ConnectingCaption, EmptyState, MatchCard, SoftToast } from "@soft-spark/ui";
 import { listMatches, orchestrate } from "@/lib/api";
 import { useMatchRealtime } from "@/lib/realtime";
 import { readSession } from "@/lib/session";
@@ -18,14 +18,14 @@ export default function MatchesPage() {
   async function load() {
     const session = readSession();
     if (!session) {
-      router.replace("/signin");
+      router.replace("/auth/sign-in");
       return;
     }
     try {
       setItems(await listMatches());
     } catch (err) {
       const status = (err as { status?: number }).status;
-      if (status === 401) router.replace("/signin");
+      if (status === 401) router.replace("/auth/sign-in");
       else if (status === 404) router.replace("/onboard");
       else setError(err instanceof Error ? err.message : "Failed to load");
     }
@@ -78,11 +78,9 @@ export default function MatchesPage() {
           onDismiss={() => setToast(null)}
         />
       ) : null}
-      {error ? <p style={{ color: "var(--ss-danger)" }}>{error}</p> : null}
+      {error ? <p className="ss-error">{error === "unauthorized" ? "Sign in to keep your bot dating" : error}</p> : null}
       {items && items.length === 0 ? (
-        <p style={{ color: "var(--ss-text-muted)" }}>
-          No active matches yet — your bot’s exploring
-        </p>
+        <EmptyState title="No active matches yet — your bot’s exploring" />
       ) : null}
       <div style={{ display: "grid", gap: 12 }}>
         {items?.map((m) => (

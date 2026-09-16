@@ -1,10 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Soft Spark">
-  <title>Soft Spark mark</title>
-  <rect width="128" height="128" rx="28" fill="#F7F1EA"/>
-  <!-- left ember -->
+  <title>Soft Spark mark on dark</title>
+  <rect width="128" height="128" rx="28" fill="#2A211C"/>
   <path fill="#E8A598" d="M52 96c-14-6-24-24-20-44 4-18 18-34 32-42-2 14-2 28 4 40 6 12 4 28-4 38-4 6-8 8-12 8z"/>
-  <!-- right ember (slightly forward) -->
   <path fill="#F0C4A8" d="M76 96c14-6 24-24 20-44-4-18-18-34-32-42 2 14 2 28-4 40-6 12-4 28 4 38 4 6 8 8 12 8z"/>
-  <!-- soft overlap blend hint -->
   <path fill="#E8A598" opacity="0.55" d="M64 28c8 10 14 24 12 40-2 14-8 26-16 34 0-12 2-24 4-34 2-10 2-24 0-40z"/>
 </svg>

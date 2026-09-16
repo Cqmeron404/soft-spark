@@ -15,7 +15,7 @@ export default function RevealPage() {
   useEffect(() => {
     const session = readSession();
     if (!session) {
-      router.replace("/signin");
+      router.replace("/auth/sign-in");
       return;
     }
     if (isRevealDismissed(params.id)) {

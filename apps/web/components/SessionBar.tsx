@@ -20,7 +20,8 @@ export function SessionBar() {
     return () => window.removeEventListener(SESSION_EVENT, refresh);
   }, [pathname]);
 
-  const authPage = pathname === "/signin" || pathname === "/signup";
+  const authPage = pathname.startsWith("/auth/") || pathname === "/signin" || pathname === "/signup";
+  const homeHref = current ? "/matches" : "/";
 
   return (
     <header
@@ -33,9 +34,9 @@ export function SessionBar() {
         borderBottom: "1px solid var(--ss-border)",
       }}
     >
-      <BrandMark href={current ? "/matches" : "/signin"} />
+      <BrandMark href={homeHref} />
       <nav style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--ss-text-muted)" }}>
-        {!authPage && !current ? <Link href="/signin">Sign in</Link> : null}
+        {!authPage && !current ? <Link href="/auth/sign-in">Sign in</Link> : null}
         {current ? (
           <>
             <span>{current.displayName}</span>
@@ -47,7 +48,7 @@ export function SessionBar() {
               onClick={async () => {
                 await signOut();
                 clearSession();
-                window.location.href = "/signin";
+                window.location.href = "/auth/sign-in";
               }}
             >
               Sign out

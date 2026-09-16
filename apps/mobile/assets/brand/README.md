@@ -1,3 +1,3 @@
-# Brand slots (Aura)
+# Ember (locked)
 
-Place `logo.svg` and `logo.png` here. Soft spark Expo shell uses a cream/accent placeholder until these land.
+Same pack as `apps/web/public/brand/`. App icon / splash / adaptive icon use the cream Ember mark (`#F7F1EA` background). Chrome uses mark 24px + “Soft Spark”.

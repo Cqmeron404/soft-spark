@@ -1,10 +1,21 @@
-# Brand slots (Aura)
+# Ember (locked)
 
-Drop the locked mark here without blocking engineering:
+Tagline: **Your bot dates. You show up.**
 
-- `logo.svg` — primary wordmark/mark
-- `logo.png` — raster fallback (optional)
+Do not invent a different mark. Do not use “Spark” alone in chrome.
 
-Web `BrandMark` reads `/brand/logo.svg`. Mobile uses `apps/mobile/assets/brand/` for the same files.
+## SVG (source of truth)
 
-Token hex updates live in `packages/ui/src/tokens.ts` and `packages/ui/src/tokens.css`.
+| File | Use |
+|------|-----|
+| `svg/soft-spark-mark.svg` | App icon (rounded square, cream) |
+| `svg/soft-spark-mark-transparent.svg` | Inline SessionBar mark |
+| `svg/soft-spark-mark-on-dark.svg` | Cocoa background |
+| `svg/soft-spark-wordmark.svg` | Mark + Soft Spark |
+| `svg/soft-spark-favicon.svg` | Favicon |
+
+## PNG
+
+`png/soft-spark-*-{32…1024}.png` for Expo icon / adaptive icon / raster fallback.
+
+`AppLogo` (`packages/ui`) reads `/brand/svg/…`. Expo chrome uses `apps/mobile/assets/brand/png/soft-spark-mark-128.png`.

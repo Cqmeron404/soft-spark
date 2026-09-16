@@ -67,6 +67,14 @@
   transition: background 220ms ease, color 220ms ease, transform 220ms ease;
 }
 
+.ss-error {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ss-accent) 28%, var(--ss-surface));
+  color: var(--ss-text);
+}
+
 @keyframes ss-crossfade {
   from {
     opacity: 0;
