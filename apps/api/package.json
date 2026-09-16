@@ -9,7 +9,8 @@
     "demo": "tsx src/demo.ts",
     "soak": "tsx src/demo.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "test:gateway": "tsx src/vercel-gateway.test.ts"
   },
   "dependencies": {
     "@better-auth/expo": "^1.2.12",
