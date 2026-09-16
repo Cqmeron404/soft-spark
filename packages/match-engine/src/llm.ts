@@ -1,11 +1,23 @@
-import { phaseForTurn, safetyCheckMessage } from "./logic";
+/**
+ * Forge adapter: OpenAI (or compatible) keys/retries behind Nexus ConversationRunner.
+ * MATCH_ENGINE_MODE=llm + OPENAI_API_KEY → Nexus llm-conversation-runner.
+ * Default MATCH_ENGINE_MODE=stub → createStubConversationRunner.
+ */
+import {
+  chemistryDimsViaJudge,
+  createLlmConversationRunner as createNexusLlmConversationRunner,
+  type LlmComplete,
+} from "./llm-conversation-runner";
 import type {
   BotTurnInput,
   BotTurnResult,
   ChemistryDims,
   ConversationRunner,
+  SafetyCode,
 } from "./types";
-import type { TranscriptTurn } from "./chemistry";
+
+export type { LlmComplete };
+export { buildBotTurnPrompt, chemistryDimsViaJudge } from "./llm-conversation-runner";
 
 export type LlmEnv = {
   apiKey?: string;
@@ -13,110 +25,72 @@ export type LlmEnv = {
   model?: string;
 };
 
-function displayNameOf(input: BotTurnInput): string {
-  return input.profile.displayName ?? "their human";
-}
-
-function historyBlock(history: BotTurnInput["history"]): string {
-  if (history.length === 0) return "(none yet)";
-  return history.map((h) => `${h.role}: ${h.text}`).join("\n");
-}
-
-export function personaSystemPrompt(input: BotTurnInput): string {
-  const turn = input.history.length + 1;
-  const phase = phaseForTurn(turn);
-  const name = displayNameOf(input);
-  const vibe = input.profile.vibeTags.join(", ") || "easygoing";
-  const interests = input.profile.interests.join(", ") || "good conversation";
-  return [
-    `You are ${name}'s dating bot. Represent their vibe (${vibe}) and interests (${interests}).`,
-    `looking_for=${input.profile.looking_for}. Phase=${phase}. Turn=${turn}/10.`,
-    `Reply in 1–3 short sentences. Ask at most one question. No venue plans. No PII.`,
-    `Never invent job, kids, exact address, income, or religion. Never claim to be the human.`,
-    `History:\n${historyBlock(input.history)}`,
-  ].join("\n");
-}
-
-async function chatComplete(
-  env: LlmEnv,
-  system: string,
-  user: string,
-  extra?: { json?: boolean }
-): Promise<string> {
-  const base = (env.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
-  const res = await fetch(`${base}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${env.apiKey}`,
+function toNexusInput(input: BotTurnInput) {
+  return {
+    matchId: input.matchId,
+    botId: input.botId,
+    userId: input.userId,
+    history: input.history,
+    profile: {
+      looking_for: input.profile.looking_for,
+      interests: input.profile.interests,
+      vibeTags: input.profile.vibeTags,
+      age: input.profile.age,
+      gender: input.profile.gender,
     },
-    body: JSON.stringify({
-      model: env.model ?? "gpt-4o-mini",
-      temperature: extra?.json ? 0 : 0.7,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      ...(extra?.json ? { response_format: { type: "json_object" } } : {}),
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`llm_http_${res.status}`);
-  }
-  const body = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    displayName: input.profile.displayName,
   };
-  const text = body.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new Error("llm_empty");
-  return text;
+}
+
+export function createOpenAiComplete(env: LlmEnv, extras?: { temperature?: number }): LlmComplete {
+  return async (prompt: string) => {
+    const base = (env.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
+    const res = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${env.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: env.model ?? "gpt-4o-mini",
+        temperature: extras?.temperature ?? 0.7,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`llm_http_${res.status}`);
+    }
+    const body = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const text = body.choices?.[0]?.message?.content?.trim();
+    if (!text) throw new Error("llm_empty");
+    return text;
+  };
 }
 
 export function createLlmConversationRunner(
   env: LlmEnv,
-  fallback: ConversationRunner
+  _fallback?: ConversationRunner
 ): ConversationRunner {
+  const nexus = createNexusLlmConversationRunner(createOpenAiComplete(env));
   return {
     async runBotTurn(input: BotTurnInput): Promise<BotTurnResult> {
-      try {
-        const text = await chatComplete(
-          env,
-          personaSystemPrompt(input),
-          "Write the next bot message only."
-        );
-        return { text, safety: safetyCheckMessage(text) };
-      } catch {
-        const result = await fallback.runBotTurn(input);
-        return result;
-      }
+      const result = await nexus.runBotTurn(toNexusInput(input));
+      if (result.safety.ok) return { text: result.text, safety: { ok: true } };
+      return {
+        text: result.text,
+        safety: { ok: false, code: result.safety.code as SafetyCode },
+      };
     },
   };
 }
 
+/** Option A: LLM judge on private transcript; heuristic fallback if judge fails. */
 export function createLlmChemistryJudge(env: LlmEnv) {
-  return async (history: TranscriptTurn[]): Promise<ChemistryDims | null> => {
-    const transcript = history.map((h) => `${h.role}: ${h.text}`).join("\n") || "(empty)";
-    const raw = await chatComplete(
-      env,
-      "Score dating-bot chemistry. Return JSON keys reciprocity,curiosity,valueAlignment,emotionalSafety,sharedSpark each 0–1. No extra keys.",
-      transcript,
-      { json: true }
-    );
-    const parsed = JSON.parse(raw) as Partial<ChemistryDims>;
-    const keys: (keyof ChemistryDims)[] = [
-      "reciprocity",
-      "curiosity",
-      "valueAlignment",
-      "emotionalSafety",
-      "sharedSpark",
-    ];
-    const dims = {} as ChemistryDims;
-    for (const k of keys) {
-      const n = Number(parsed[k]);
-      if (!Number.isFinite(n)) return null;
-      dims[k] = Math.max(0, Math.min(1, n));
-    }
-    return dims;
-  };
+  const complete = createOpenAiComplete(env, { temperature: 0 });
+  return (history: Array<{ role: string; text: string }>, fallback: ChemistryDims) =>
+    chemistryDimsViaJudge(history, complete, fallback);
 }
 
 export function llmConfigured(env: {

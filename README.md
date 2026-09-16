@@ -14,7 +14,7 @@ Clients see **state + confidence band + invite card** only. Raw scores, `message
 | `apps/realtime` | Partykit party (`match` rooms) for band/invite fan-out |
 | `packages/db` | Drizzle schema + Postgres / PGlite + seed |
 | `packages/shared` | `MatchState`, bands, events, client DTOs, miles helpers |
-| `packages/match-engine` | Nexus interfaces + stub/LLM runners + midpoint venues |
+| `packages/match-engine` | Nexus drop-ins (`match-logic-v0`, `chemistry-from-transcript`, `llm-conversation-runner`) + stub/LLM `ConversationRunner` + midpoint venues |
 | `packages/ui` | Soft spark tokens / `BandChip` / `SignalLine` / `InviteCard` |
 
 ## Quick start
@@ -90,7 +90,7 @@ Protected routes (`/users/me/*`, `/matches*`, `/realtime/*`) require a Better Au
 
 1. Hard filter (mutual `interestedIn`/gender, dealbreakers, travel overlap) → Match `exploring`
 2. Bot turns (`bot.turn.requested` / `completed`) within 10 turns / 12 min; **paused** bots are skipped
-3. Chemistry dims from transcript (heuristic, or LLM judge when `MATCH_ENGINE_MODE=llm`)
+3. Chemistry dims from the **private** transcript (`chemistry-from-transcript.ts`; LLM judge when `MATCH_ENGINE_MODE=llm` + key). Clients never see `messages[]`.
 4. `MatchScorer.score` → `match.score.updated` (internal confidence; clients get band)
 5. If confidence ≥ 0.75 and safety ok → `suggestVenue` (mid-point ∩ travel ∩ cuisine ∩ budget, ≤3)
    - ≥1 candidate → `invite_ready` → dual invite → `invited` + `invite.sent`

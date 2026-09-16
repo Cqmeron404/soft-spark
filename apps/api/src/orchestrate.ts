@@ -10,7 +10,6 @@ import {
   createStubConversationRunner,
   createStubMatchScorer,
   createStubSafetyGate,
-  dimsForTurn,
   earlyExitLowFit,
   llmConfigured,
   passesHardFilter,
@@ -140,7 +139,7 @@ export async function orchestrateMatch(input: {
     profileFit: 0,
     chemistry: 0,
     logistics: 0,
-    chemistryDims: dimsForTurn(0, false),
+    chemistryDims: chemistryFromTranscript([]),
   });
   const convo = await store.createConversation(match.id);
   const botA = await store.botForUser(input.userAId);
@@ -223,14 +222,12 @@ export async function orchestrateMatch(input: {
       return (await store.getMatch(match.id))!;
     }
 
-    const dims = await chemistryFromTranscript(
-      (await store.messagesFor(convo.id)).map((m) => ({
-        role: m.role,
-        text: m.text,
-        at: m.createdAt,
-      })),
-      { snapshots: { a, b }, judge }
-    );
+    const transcript = (await store.messagesFor(convo.id)).map((m) => ({
+      role: m.role,
+      text: m.text,
+    }));
+    const heuristic = chemistryFromTranscript(transcript);
+    const dims = judge ? await judge(transcript, heuristic) : heuristic;
     match = await store.updateMatch(match.id, { chemistryDims: dims });
     const pf = profileFit(a, b).value;
     const chemistry =
