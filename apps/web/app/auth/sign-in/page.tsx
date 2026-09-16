@@ -16,11 +16,15 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submit() {
+  async function submit(credentials?: { email: string; password: string }) {
+    const nextEmail = credentials?.email ?? email;
+    const nextPassword = credentials?.password ?? password;
+    setEmail(nextEmail);
+    setPassword(nextPassword);
     setError(null);
     setBusy(true);
     try {
-      await signInEmail({ email, password });
+      await signInEmail({ email: nextEmail, password: nextPassword });
       try {
         const me = await getMe();
         writeSession({ id: me.id, displayName: me.displayName });
@@ -63,20 +67,26 @@ export default function SignInPage() {
         <button
           type="button"
           className="ss-btn ss-btn-ghost"
-          onClick={() => {
-            setEmail(DEMO_ACCOUNTS.maya.email);
-            setPassword(DEMO_ACCOUNTS.maya.password);
-          }}
+          disabled={busy}
+          onClick={() =>
+            void submit({
+              email: DEMO_ACCOUNTS.maya.email,
+              password: DEMO_ACCOUNTS.maya.password,
+            })
+          }
         >
           Maya demo
         </button>
         <button
           type="button"
           className="ss-btn ss-btn-ghost"
-          onClick={() => {
-            setEmail(DEMO_ACCOUNTS.jordan.email);
-            setPassword(DEMO_ACCOUNTS.jordan.password);
-          }}
+          disabled={busy}
+          onClick={() =>
+            void submit({
+              email: DEMO_ACCOUNTS.jordan.email,
+              password: DEMO_ACCOUNTS.jordan.password,
+            })
+          }
         >
           Jordan demo
         </button>
