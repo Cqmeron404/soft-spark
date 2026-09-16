@@ -16,7 +16,6 @@ api_env=(
   BETTER_AUTH_SECRET
   BETTER_AUTH_URL
   WEB_ORIGIN
-  GOOGLE_PLACES_API_KEY
 )
 
 case "$cmd" in
@@ -30,6 +29,14 @@ case "$cmd" in
       if [ -z "${!v:-}" ]; then echo "MISSING  $v (web)"; missing=1; else echo "set      $v"; fi
     done
     echo "optional MATCH_ENGINE_MODE=${MATCH_ENGINE_MODE:-stub}"
+    if [ "${ALLOW_VENUE_SEED:-}" = "1" ] || [ "${VENUE_MODE:-}" = "seed" ]; then
+      echo "venues   seed (ALLOW_VENUE_SEED=${ALLOW_VENUE_SEED:-} VENUE_MODE=${VENUE_MODE:-})"
+    elif [ -n "${GOOGLE_PLACES_API_KEY:-}" ]; then
+      echo "venues   places (GOOGLE_PLACES_API_KEY set)"
+    else
+      echo "MISSING  venues: set ALLOW_VENUE_SEED=1 or VENUE_MODE=seed, or GOOGLE_PLACES_API_KEY"
+      missing=1
+    fi
     echo "optional OPENAI_API_KEY=$([ -n "${OPENAI_API_KEY:-}" ] && echo set || echo missing)"
     echo "optional VAPID_PUBLIC_KEY=$([ -n "${VAPID_PUBLIC_KEY:-}" ] && echo set || echo missing)"
     echo "optional VAPID_PRIVATE_KEY=$([ -n "${VAPID_PRIVATE_KEY:-}" ] && echo set || echo missing)"

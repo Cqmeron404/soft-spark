@@ -4,18 +4,22 @@
   "packageManager": "pnpm@10.33.3",
   "scripts": {
     "dev": "turbo dev",
-    "dev:api": "pnpm --filter @soft-spark/api dev",
+    "dev:api": "pnpm --filter @soft-spark/api... build && pnpm --filter @soft-spark/api dev",
     "dev:web": "pnpm --filter @soft-spark/web dev",
     "dev:realtime": "pnpm --filter @soft-spark/realtime dev",
     "build": "turbo build --filter=@soft-spark/shared --filter=@soft-spark/db --filter=@soft-spark/match-engine --filter=@soft-spark/ui --filter=@soft-spark/api --filter=@soft-spark/web",
     "typecheck": "turbo typecheck --filter=@soft-spark/shared --filter=@soft-spark/db --filter=@soft-spark/match-engine --filter=@soft-spark/ui --filter=@soft-spark/api --filter=@soft-spark/web --filter=@soft-spark/mobile",
-    "demo": "pnpm --filter @soft-spark/api demo",
-    "soak": "pnpm --filter @soft-spark/api soak",
+    "demo": "pnpm --filter @soft-spark/api... build && pnpm --filter @soft-spark/api demo",
+    "soak": "pnpm --filter @soft-spark/api... build && pnpm --filter @soft-spark/api soak",
     "seed": "pnpm --filter @soft-spark/db seed",
-    "test": "pnpm --filter @soft-spark/match-engine test && pnpm demo"
+    "test": "pnpm --filter @soft-spark/api... build && pnpm --filter @soft-spark/match-engine test && pnpm --filter @soft-spark/api demo"
   },
   "devDependencies": {
+    "esbuild": "0.25.9",
     "turbo": "^2.3.3",
     "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   }
 }

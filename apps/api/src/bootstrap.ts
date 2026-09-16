@@ -7,7 +7,7 @@ import { createMemoryRealtimeHub } from "./realtime.js";
 import { createDbStore } from "./store.js";
 
 export type BootstrapOptions = OpenDbOptions & {
-  /** Force Denver catalog seed (tests). Ignored in prod unless ALLOW_VENUE_SEED=1. */
+  /** Force Denver catalog seed (tests). Prod: ALLOW_VENUE_SEED=1 or VENUE_MODE=seed. */
   seedCatalog?: boolean;
 };
 

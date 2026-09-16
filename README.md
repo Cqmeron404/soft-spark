@@ -10,7 +10,7 @@ Clients see **state + confidence band + invite card** only (frozen **A**). Raw s
 |------|------|
 | `apps/web` | Next.js — Vercel config, auth, onboard (circle crop / initials skip), matches, reveal, invite DualStatusRow, web push |
 | `apps/mobile` | Expo — DualStatusRow parity, photo step, Expo push token |
-| `apps/api` | Hono — Better Auth, Drizzle, SSE, Places-backed VenueSuggester, status-only push, match job |
+| `apps/api` | Hono — Better Auth, Drizzle, SSE, seed or Places VenueSuggester, status-only push, match job |
 | `apps/realtime` | Partykit party (`match` rooms) for band/invite fan-out |
 | `packages/db` | Drizzle schema + Postgres / PGlite + **local/demo** venue catalog seed |
 | `packages/shared` | `MatchState`, bands, events, client DTOs, miles, DualStatusRow copy, push payloads |
@@ -29,7 +29,7 @@ pnpm soak    # alias of demo; stub by default
 pnpm test    # invite_threshold 0.75 soak + demo
 ```
 
-`pnpm demo` (and `pnpm soak`) signs up two Denver users (Maya, Jordan) via Better Auth, onboards (photoUrl), runs hard-filter → persona bot turns → transcript-derived chemistry → midpoint venues → dual accept, and asserts **booked**. It also checks prod boot/Places guards, 401s, paused bots (one + both), client payloads without `confidence` / transcripts / `messages[]`, `match.venue_unavailable` keeping `exploring`, intent soft mismatch, safety inject → `match.safety_failed`, early `low_fit_early_exit`, rollback `MATCH_ENGINE_MODE=stub`, LLM down stub fallback, DualStatusRow copy, and restart survival.
+`pnpm demo` (and `pnpm soak`) signs up two Denver users (Maya, Jordan) via Better Auth, onboards (photoUrl), runs hard-filter → persona bot turns → transcript-derived chemistry → midpoint venues → dual accept, and asserts **booked**. It also checks prod boot/Places guards (seed flags skip Places), 401s, paused bots (one + both), client payloads without `confidence` / transcripts / `messages[]`, `match.venue_unavailable` keeping `exploring`, intent soft mismatch, safety inject → `match.safety_failed`, early `low_fit_early_exit`, rollback `MATCH_ENGINE_MODE=stub`, LLM down stub fallback, DualStatusRow copy, and restart survival.
 
 Persona turns must still clear **invite_threshold 0.75** — the threshold is frozen; do not lower it if soak dips.
 
@@ -54,22 +54,34 @@ Live deploy needs **host secrets**. This repo does **not** invent credentials. W
 | Surface | Config | Notes |
 |---------|--------|--------|
 | Web | `apps/web/vercel.json` + root `vercel.json` | Vercel project Root Directory = `apps/web` (or deploy from repo root). Set `NEXT_PUBLIC_API_URL`. |
-| API | `apps/api/Dockerfile` (preferred) + `apps/api/vercel.json` | Long-lived Node for SSE + match jobs. Serverless Vercel is a fallback (`maxDuration` 60s; SSE degraded). |
+| API | `apps/api/vercel.json` + `apps/api/Dockerfile` | Vercel Root Directory = `apps/api`. `installCommand` / `buildCommand` run from the **repo root** so `@soft-spark/db` (and siblings) emit `dist/` JS. Serverless `maxDuration` 60s (SSE degraded). Docker is preferred for long-lived Node. |
 | Checklist | `bash scripts/deploy.sh check` | Prints which required vars are missing (values never printed). |
 | VAPID | `bash scripts/deploy.sh vapid` | `npx web-push generate-vapid-keys` — do not commit keys. |
 
-**Boot (`NODE_ENV=production`)** refuses to start without `DATABASE_URL` (`postgres://…`) and `BETTER_AUTH_SECRET` (not the dev default). `/health` reports boolean env flags only.
+**Boot (`NODE_ENV=production`)** refuses to start without `DATABASE_URL` (`postgres://…`) and `BETTER_AUTH_SECRET` (not the dev default). Missing Google Places does **not** fail boot when `ALLOW_VENUE_SEED=1` or `VENUE_MODE=seed`. `/health` reports `venues` as `seed` | `places` plus boolean env flags (no secret values).
 
 ### Prod go-live secrets (exact)
 
-Required:
+Required (Phase 1 auth/DB — Vercel **API** project):
 
 - `DATABASE_URL` — Postgres URL
 - `BETTER_AUTH_SECRET` — 32+ char signing secret (`AUTH_SECRET` alias)
-- `BETTER_AUTH_URL` — public API origin (`https://api.example.com`)
-- `WEB_ORIGIN` — public web origin (`https://app.example.com`)
-- `GOOGLE_PLACES_API_KEY` — **required in prod** behind `VenueSuggester` (seed catalog is local/demo only)
-- `NEXT_PUBLIC_API_URL` — web → API
+- `BETTER_AUTH_URL` — public API origin (`https://soft-spark-api.vercel.app`)
+- `WEB_ORIGIN` — public web origin (`https://soft-spark.vercel.app`)
+- `AUTH_MODE=prod` — optional; already implied when `NODE_ENV=production`
+
+Venues (**$0 go-live**, Vercel API) — pick **one**:
+
+- `ALLOW_VENUE_SEED=1` **or** `VENUE_MODE=seed` — Denver catalog (no Places key)
+- later: `GOOGLE_PLACES_API_KEY` with seed **unset** / not `VENUE_MODE=seed`
+
+Match engine (default stub — no OpenAI spend):
+
+- `MATCH_ENGINE_MODE=stub` (default / rollback; omit or set explicitly)
+
+Web (Vercel **web** project):
+
+- `NEXT_PUBLIC_API_URL` — web → API (`https://soft-spark-api.vercel.app`)
 
 Push (status-only A; stubbed until set):
 
@@ -85,7 +97,7 @@ LLM soak (optional; stub fallback if missing). **Rollback = `MATCH_ENGINE_MODE=s
 
 Copy `.env.example` locally. Set the same names in Vercel / Fly / Render dashboards.
 
-**Blockers for a live URL from this PR:** no Vercel/Places/VAPID/OpenAI secrets in the agent environment, so no production URL is claimed here. After secrets exist: `bash scripts/deploy.sh check && bash scripts/deploy.sh web` and deploy API via Docker/`scripts/deploy.sh api`.
+**Blockers for a live URL from this PR:** this change is aimed at `/health` JSON on `https://soft-spark-api.vercel.app` after merge + redeploy (Hobby env is already wired). Workspace packages now ship `dist/` JS (`exports` no longer point at raw `.ts`). After merge: redeploy the API project.
 
 ## Env vars
 
@@ -97,7 +109,9 @@ Copy `.env.example` locally. Set the same names in Vercel / Fly / Render dashboa
 | `BETTER_AUTH_URL` | prod | Public API origin, default `http://localhost:8787`. |
 | `AUTH_MODE` | no | `prod` disables `x-user-id` bypass (also off when `NODE_ENV=production`). |
 | `WEB_ORIGIN` | prod | CORS / Better Auth trusted origin, default `http://localhost:3000`. |
-| `GOOGLE_PLACES_API_KEY` | **prod VenueSuggester** | Nearby search. Local/demo uses seeded Denver catalog. 0 results → `exploring` + `match.venue_unavailable`. |
+| `GOOGLE_PLACES_API_KEY` | prod Places | Nearby search when seed is **not** forced. 0 results → `exploring` + `match.venue_unavailable`. |
+| `ALLOW_VENUE_SEED` | $0 venues | `1` allows Denver catalog seed **and** catalog VenueSuggester in production (no Places key). |
+| `VENUE_MODE` | $0 venues | `seed` same as `ALLOW_VENUE_SEED=1`. Forced seed wins over a present Places key. Unset + key → `places`. |
 | `MATCH_ENGINE_MODE` | always | `stub` (default / **rollback**) or `llm`. Stub never calls OpenAI even if a key is set. Mode=`llm` without `OPENAI_API_KEY` forces stub + log. |
 | `OPENAI_API_KEY` | llm | Chat Completions for `ConversationRunner` + optional chemistry judge. |
 | `OPENAI_BASE_URL` / `OPENAI_MODEL` | no | OpenAI-compatible override. |
@@ -108,7 +122,6 @@ Copy `.env.example` locally. Set the same names in Vercel / Fly / Render dashboa
 | `NEXT_PUBLIC_API_URL` | web | Default `http://localhost:8787`. |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | web push | Browser subscribe key. |
 | `EXPO_PUBLIC_API_URL` | Expo | Default `http://localhost:8787`. |
-| `ALLOW_VENUE_SEED` | no | Must be `1` to seed catalog when `NODE_ENV=production` (not for go-live). |
 
 Logo (Ember, locked): `apps/web/public/brand/` and `apps/mobile/assets/brand/`. Tokens: `packages/ui/src/tokens.ts`.
 
@@ -118,7 +131,7 @@ Protected routes (`/users/me/*`, `/matches*`, `/realtime/*`) require a Better Au
 
 | Method | Path | Notes |
 |--------|------|--------|
-| GET | `/health` | `{ ok, env: { database, authSecret, places, llm, webPush } }` — booleans only |
+| GET | `/health` | `{ ok, venues: "seed"\|"places", matchEngine, env: { database, authSecret, places, llm, webPush } }` — no secrets |
 | GET | `/push/vapid-public` | `{ configured, publicKey }` for web push subscribe |
 | POST/GET | `/auth/*` | Better Auth |
 | POST | `/users/me/onboard` | Session required. `botDatingOptIn: true` else **400**. Optional `photoUrl` |

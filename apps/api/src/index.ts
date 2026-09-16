@@ -7,6 +7,6 @@ const started = await getApp();
 serve({ fetch: started.fetch, port }, () => {
   const flags = started.flags;
   console.log(
-    `soft-spark api listening on http://localhost:${port} (prod=${flags.production} db=${flags.database} places=${flags.places} llm=${flags.llm} webPush=${flags.webPush})`
+    `soft-spark api listening on http://localhost:${port} (prod=${flags.production} db=${flags.database} venues=${flags.venues} places=${flags.places} llm=${flags.llm} webPush=${flags.webPush})`
   );
 });

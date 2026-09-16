@@ -10,11 +10,13 @@ import {
   createStubConversationRunner,
   createStubMatchScorer,
   createStubSafetyGate,
+  DENVER_PLACES,
   earlyExitLowFit,
   llmConfigured,
   passesHardFilter,
   profileFit,
   resolveMatchEngineMode,
+  resolveVenueMode,
   type MatchScorer,
   type ConversationRunner,
   type SafetyGate,
@@ -23,7 +25,7 @@ import {
 } from "@soft-spark/match-engine";
 import { EVENTS, isClientPushType, isHomeCardReason, type ClientRealtimeEvent } from "@soft-spark/shared";
 import type { EventLog } from "./event-log.js";
-import { assertPlacesInProd, isProduction } from "./env.js";
+import { assertPlacesInProd } from "./env.js";
 import type { PushDispatcher } from "./push.js";
 import type { RealtimeHub } from "./realtime.js";
 import { snapshotFor } from "./snapshot.js";
@@ -61,12 +63,14 @@ export async function createEngine(
         stubRunner
       )
     : stubRunner;
-  const catalog = isProduction() ? [] : await store.listCatalog();
   const googleKey = process.env.GOOGLE_PLACES_API_KEY;
   assertPlacesInProd(process.env, { emptyVenues: options?.emptyVenues });
-  const provider = googleKey
-    ? createGooglePlaceProvider({ apiKey: googleKey })
-    : createCatalogPlaceProvider(catalog);
+  const venueMode = resolveVenueMode(process.env);
+  const usePlaces = venueMode === "places" && Boolean(googleKey) && !options?.emptyVenues;
+  const catalog = usePlaces ? [] : await store.listCatalog();
+  const provider = usePlaces
+    ? createGooglePlaceProvider({ apiKey: googleKey as string })
+    : createCatalogPlaceProvider(catalog.length ? catalog : DENVER_PLACES);
   return {
     scorer: createStubMatchScorer(async (matchId) => {
       const match = await store.getMatch(matchId);
@@ -331,7 +335,7 @@ export async function orchestrateMatch(input: {
         approxNeighborhood: pick.approxNeighborhood,
         lat: (userA.homeLat + userB.homeLat) / 2,
         lng: (userA.homeLng + userB.homeLng) / 2,
-        source: process.env.GOOGLE_PLACES_API_KEY ? "places" : "catalog",
+        source: resolveVenueMode(process.env) === "places" ? "places" : "catalog",
       });
       const window = nextInviteWindow(userA.homeTz || "America/Denver");
       const invite = await store.createInvite({

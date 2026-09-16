@@ -130,15 +130,38 @@ function asSnapshot(u: SuggestVenueInput["userA"]): UserProfileSnapshot {
   };
 }
 
-/** Prod: GOOGLE_PLACES_API_KEY is required behind VenueSuggester (seed catalog is local/demo). */
-export function assertPlacesKeyInProd(
-  env: { NODE_ENV?: string; GOOGLE_PLACES_API_KEY?: string },
-  options?: { empty?: boolean }
-): void {
+export type VenueMode = "seed" | "places";
+
+export type VenueEnv = {
+  NODE_ENV?: string;
+  GOOGLE_PLACES_API_KEY?: string;
+  ALLOW_VENUE_SEED?: string;
+  VENUE_MODE?: string;
+};
+
+/** $0 go-live: Denver catalog when ALLOW_VENUE_SEED=1 or VENUE_MODE=seed. */
+export function isForcedSeedVenueMode(env: VenueEnv): boolean {
+  return env.ALLOW_VENUE_SEED === "1" || env.VENUE_MODE === "seed";
+}
+
+/**
+ * Active venue source. Forced seed wins over a Places key.
+ * Places when a key is present and seed is not forced; otherwise seed (local/demo).
+ */
+export function resolveVenueMode(env: VenueEnv): VenueMode {
+  if (isForcedSeedVenueMode(env)) return "seed";
+  if (env.GOOGLE_PLACES_API_KEY) return "places";
+  return "seed";
+}
+
+/** Prod VenueSuggester requires Places unless seed/demo catalog is explicitly allowed. */
+export function assertPlacesKeyInProd(env: VenueEnv, options?: { empty?: boolean }): void {
   if (options?.empty) return;
-  if (env.NODE_ENV === "production" && !env.GOOGLE_PLACES_API_KEY) {
+  if (env.NODE_ENV !== "production") return;
+  if (isForcedSeedVenueMode(env)) return;
+  if (!env.GOOGLE_PLACES_API_KEY) {
     throw new Error(
-      "GOOGLE_PLACES_API_KEY required when NODE_ENV=production (VenueSuggester). Seed catalog is local/demo only."
+      "GOOGLE_PLACES_API_KEY required when NODE_ENV=production (VenueSuggester), unless ALLOW_VENUE_SEED=1 or VENUE_MODE=seed."
     );
   }
 }
