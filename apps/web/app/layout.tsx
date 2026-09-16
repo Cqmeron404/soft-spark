@@ -12,7 +12,10 @@ export const metadata: Metadata = {
   title: "Soft Spark",
   description: "Your bot dates. You show up.",
   icons: {
-    icon: [{ url: "/brand/svg/soft-spark-favicon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/brand/svg/soft-spark-favicon.svg", type: "image/svg+xml" },
+      { url: "/brand/png/soft-spark-favicon-32.png", sizes: "32x32", type: "image/png" },
+    ],
     apple: [{ url: "/brand/png/soft-spark-favicon-180.png" }],
   },
 };

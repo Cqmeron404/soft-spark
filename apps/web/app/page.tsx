@@ -36,7 +36,7 @@ export default function Home() {
   return (
     <div style={{ display: "grid", gap: 24, paddingTop: 12 }}>
       <div style={{ display: "grid", gap: 12, justifyItems: "start" }}>
-        <AppLogo variant="wordmark" size={48} />
+        <AppLogo variant="wordmark" size={88} />
         <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 32, margin: 0, lineHeight: 1.15 }}>
           {TAGLINE}
         </h1>

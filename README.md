@@ -125,7 +125,7 @@ Copy `.env.example` locally. Set the same names in Vercel / Fly / Render dashboa
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | web push | Browser subscribe key. |
 | `EXPO_PUBLIC_API_URL` | Expo | Default `http://localhost:8787`. |
 
-Logo (Ember, locked): `apps/web/public/brand/` and `apps/mobile/assets/brand/`. Tokens: `packages/ui/src/tokens.ts`.
+Logo (Ember, locked Aura pack): `apps/web/public/brand/` and `apps/mobile/assets/brand/`. Prefer PNG wordmark over SVG. Tokens: `packages/ui/src/tokens.ts`.
 
 ## API
 
