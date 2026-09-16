@@ -13,6 +13,7 @@ COPY packages/match-engine/package.json packages/match-engine/
 COPY packages/ui/package.json packages/ui/
 RUN pnpm install --frozen-lockfile
 COPY . .
+RUN pnpm --filter @soft-spark/api... build
 ENV NODE_ENV=production
 ENV PORT=8787
 EXPOSE 8787

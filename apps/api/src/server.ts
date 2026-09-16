@@ -30,6 +30,9 @@ export async function startApp(): Promise<StartedApp> {
 }
 
 export function getApp(): Promise<StartedApp> {
-  singleton ??= startApp();
+  singleton ??= startApp().catch((err) => {
+    singleton = undefined;
+    throw err;
+  });
   return singleton;
 }

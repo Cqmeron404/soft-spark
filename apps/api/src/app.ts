@@ -18,7 +18,7 @@ import { createEngine, orchestrateMatch, respondInvite } from "./orchestrate.js"
 import type { PushDispatcher } from "./push.js";
 import type { RealtimeHub } from "./realtime.js";
 import type { SparkStore } from "./store.js";
-import { envFlags } from "./env.js";
+import { healthPayload } from "./env.js";
 
 export type AppEnv = {
   Variables: { userId: string; authId: string };
@@ -47,22 +47,7 @@ export function createApp(deps: AppDeps) {
     })
   );
 
-  app.get("/health", (c) => {
-    const flags = envFlags();
-    return c.json({
-      ok: true,
-      service: "soft-spark-api",
-      authMode: authMode(),
-      matchEngine: process.env.MATCH_ENGINE_MODE ?? "stub",
-      env: {
-        database: flags.database,
-        authSecret: flags.authSecret,
-        places: flags.places,
-        llm: flags.llm,
-        webPush: flags.webPush,
-      },
-    });
-  });
+  app.get("/health", (c) => c.json(healthPayload()));
 
   app.get("/push/vapid-public", (c) =>
     c.json({

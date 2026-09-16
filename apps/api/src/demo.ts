@@ -101,8 +101,16 @@ async function main() {
     failures.push("prod boot should require DATABASE_URL + BETTER_AUTH_SECRET");
   } else console.log("ok  prod boot validates DATABASE_URL + BETTER_AUTH_SECRET");
   if (placesMissing({ NODE_ENV: "production" } as NodeJS.ProcessEnv)[0] !== "GOOGLE_PLACES_API_KEY") {
-    failures.push("prod places should require GOOGLE_PLACES_API_KEY");
-  } else console.log("ok  prod VenueSuggester requires GOOGLE_PLACES_API_KEY");
+    failures.push("prod places should require GOOGLE_PLACES_API_KEY when seed mode is off");
+  } else console.log("ok  prod VenueSuggester requires GOOGLE_PLACES_API_KEY unless seed");
+  const seedEnv = { NODE_ENV: "production", ALLOW_VENUE_SEED: "1" } as NodeJS.ProcessEnv;
+  const venueModeEnv = { NODE_ENV: "production", VENUE_MODE: "seed" } as NodeJS.ProcessEnv;
+  if (placesMissing(seedEnv).length || placesMissing(venueModeEnv).length) {
+    failures.push("prod seed mode (ALLOW_VENUE_SEED=1 or VENUE_MODE=seed) should not require Places");
+  } else console.log("ok  prod seed flags skip GOOGLE_PLACES_API_KEY");
+  if (bootMissing({ NODE_ENV: "production", ALLOW_VENUE_SEED: "1" } as NodeJS.ProcessEnv).includes("GOOGLE_PLACES_API_KEY")) {
+    failures.push("prod boot must not fail solely for missing Places when seed mode is on");
+  } else console.log("ok  prod boot does not require Places in seed mode");
 
   const ctx = await bootstrap({ pglite: new PGlite() });
   const app = createApp(ctx);
@@ -382,9 +390,21 @@ async function main() {
   if (pushReg.status !== 201) failures.push(`push register expected 201, got ${pushReg.status}`);
   else console.log("ok  Expo push token registered (status-only sender)");
 
-  const health = await json<{ env?: { database?: boolean; places?: boolean } }>(await app.request("/health"));
+  const health = await json<{
+    venues?: string;
+    matchEngine?: string;
+    env?: { database?: boolean; places?: boolean };
+  }>(await app.request("/health"));
   if (!health.env) failures.push("health missing env flags");
-  else console.log("ok  /health reports env flags without secrets");
+  if (health.venues !== "seed" && health.venues !== "places") {
+    failures.push(`health venues mode should be seed|places, got ${health.venues}`);
+  }
+  if ((health.matchEngine ?? "stub") !== "stub" && process.env.MATCH_ENGINE_MODE === "stub") {
+    failures.push("default MATCH_ENGINE_MODE should be stub");
+  }
+  if (health.venues === "seed" || health.venues === "places") {
+    console.log(`ok  /health reports venues=${health.venues} matchEngine=${health.matchEngine ?? "stub"} (no secrets)`);
+  }
 
   await runNexusSoakScenarios({
     app,

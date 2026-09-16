@@ -17,7 +17,7 @@ import { createLlmConversationRunner, resolveMatchEngineMode } from "./llm";
 import { buildBotTurnPrompt } from "./llm-conversation-runner";
 import { createStubConversationRunner, HAPPY_PATH_DIMS } from "./stubs";
 import type { BotTurnInput, ScoreResult, UserProfileSnapshot } from "./types";
-import { assertPlacesKeyInProd } from "./venue-provider";
+import { assertPlacesKeyInProd, resolveVenueMode } from "./venue-provider";
 
 const MAYA: UserProfileSnapshot = {
   displayName: "Maya",
@@ -200,7 +200,7 @@ export async function runInviteThresholdRegression(): Promise<string[]> {
 
   try {
     assertPlacesKeyInProd({ NODE_ENV: "production" });
-    failures.push("prod VenueSuggester must require GOOGLE_PLACES_API_KEY");
+    failures.push("prod VenueSuggester must require GOOGLE_PLACES_API_KEY when seed mode is off");
   } catch {
     /* expected */
   }
@@ -213,6 +213,34 @@ export async function runInviteThresholdRegression(): Promise<string[]> {
     assertPlacesKeyInProd({ NODE_ENV: "development" });
   } catch {
     failures.push("local VenueSuggester should allow catalog without Places key");
+  }
+  try {
+    assertPlacesKeyInProd({ NODE_ENV: "production", ALLOW_VENUE_SEED: "1" });
+  } catch {
+    failures.push("prod ALLOW_VENUE_SEED=1 should allow catalog without Places key");
+  }
+  try {
+    assertPlacesKeyInProd({ NODE_ENV: "production", VENUE_MODE: "seed" });
+  } catch {
+    failures.push("prod VENUE_MODE=seed should allow catalog without Places key");
+  }
+  if (resolveVenueMode({ NODE_ENV: "production", ALLOW_VENUE_SEED: "1" }) !== "seed") {
+    failures.push("ALLOW_VENUE_SEED=1 should resolve venues mode seed");
+  }
+  if (resolveVenueMode({ NODE_ENV: "production", VENUE_MODE: "seed" }) !== "seed") {
+    failures.push("VENUE_MODE=seed should resolve venues mode seed");
+  }
+  if (resolveVenueMode({ NODE_ENV: "production", GOOGLE_PLACES_API_KEY: "k" }) !== "places") {
+    failures.push("Places key without seed flags should resolve venues mode places");
+  }
+  if (
+    resolveVenueMode({
+      NODE_ENV: "production",
+      GOOGLE_PLACES_API_KEY: "k",
+      VENUE_MODE: "seed",
+    }) !== "seed"
+  ) {
+    failures.push("forced seed should win over GOOGLE_PLACES_API_KEY");
   }
 
   return failures;

@@ -1,5 +1,12 @@
 /** Production boot + feature flags. Never invent credentials. */
 
+import {
+  assertPlacesKeyInProd,
+  isForcedSeedVenueMode,
+  resolveVenueMode,
+  type VenueMode,
+} from "@soft-spark/match-engine";
+
 export const DEV_AUTH_SECRET = "soft-spark-dev-secret-change-me-32chars!!";
 
 export function isProduction(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -20,6 +27,7 @@ export type EnvFlagReport = {
   database: boolean;
   authSecret: boolean;
   places: boolean;
+  venues: VenueMode;
   llm: boolean;
   webPush: boolean;
   expoPush: boolean;
@@ -32,9 +40,45 @@ export function envFlags(env: NodeJS.ProcessEnv = process.env): EnvFlagReport {
     database: isPostgresUrl(env.DATABASE_URL),
     authSecret: Boolean(secret) && secret !== DEV_AUTH_SECRET,
     places: Boolean(env.GOOGLE_PLACES_API_KEY),
+    venues: resolveVenueMode(env),
     llm: env.MATCH_ENGINE_MODE === "llm" && Boolean(env.OPENAI_API_KEY),
     webPush: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY),
     expoPush: true,
+  };
+}
+
+export type HealthPayload = {
+  ok: boolean;
+  service: "soft-spark-api";
+  authMode: "prod" | "dev";
+  matchEngine: string;
+  venues: VenueMode;
+  env: {
+    database: boolean;
+    authSecret: boolean;
+    places: boolean;
+    llm: boolean;
+    webPush: boolean;
+  };
+  bootMissing?: string[];
+};
+
+/** Public /health body. Booleans + venue mode only — never secret values. */
+export function healthPayload(env: NodeJS.ProcessEnv = process.env): HealthPayload {
+  const flags = envFlags(env);
+  return {
+    ok: true,
+    service: "soft-spark-api",
+    authMode: env.AUTH_MODE === "prod" || env.NODE_ENV === "production" ? "prod" : "dev",
+    matchEngine: env.MATCH_ENGINE_MODE ?? "stub",
+    venues: flags.venues,
+    env: {
+      database: flags.database,
+      authSecret: flags.authSecret,
+      places: flags.places,
+      llm: flags.llm,
+      webPush: flags.webPush,
+    },
   };
 }
 
@@ -57,9 +101,10 @@ export function validateBootEnv(env: NodeJS.ProcessEnv = process.env): void {
   }
 }
 
-/** Places AC: GOOGLE_PLACES_API_KEY required in prod behind VenueSuggester. */
+/** Places key required in prod behind VenueSuggester unless seed catalog is allowed. */
 export function placesMissing(env: NodeJS.ProcessEnv = process.env): string[] {
   if (!isProduction(env)) return [];
+  if (isForcedSeedVenueMode(env)) return [];
   if (!env.GOOGLE_PLACES_API_KEY) return ["GOOGLE_PLACES_API_KEY"];
   return [];
 }
@@ -68,18 +113,12 @@ export function assertPlacesInProd(
   env: NodeJS.ProcessEnv = process.env,
   options?: { emptyVenues?: boolean }
 ): void {
-  if (options?.emptyVenues) return;
-  const missing = placesMissing(env);
-  if (missing.length) {
-    throw new Error(
-      "GOOGLE_PLACES_API_KEY required when NODE_ENV=production (VenueSuggester). Seed catalog is local/demo only."
-    );
-  }
+  assertPlacesKeyInProd(env, { empty: options?.emptyVenues });
 }
 
 export function allowVenueCatalogSeed(env: NodeJS.ProcessEnv = process.env): boolean {
   if (!isProduction(env)) return true;
-  return env.ALLOW_VENUE_SEED === "1";
+  return isForcedSeedVenueMode(env);
 }
 
 export const GO_LIVE_SECRETS = [
@@ -87,7 +126,7 @@ export const GO_LIVE_SECRETS = [
   "BETTER_AUTH_SECRET",
   "BETTER_AUTH_URL",
   "WEB_ORIGIN",
-  "GOOGLE_PLACES_API_KEY",
+  "ALLOW_VENUE_SEED=1 or VENUE_MODE=seed (or GOOGLE_PLACES_API_KEY)",
   "VAPID_PUBLIC_KEY",
   "VAPID_PRIVATE_KEY",
   "VAPID_SUBJECT",

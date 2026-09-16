@@ -9,7 +9,8 @@
     "demo": "tsx src/demo.ts",
     "soak": "tsx src/demo.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit && node scripts/bundle.mjs",
+    "bundle": "node scripts/bundle.mjs"
   },
   "dependencies": {
     "@better-auth/expo": "^1.2.12",
