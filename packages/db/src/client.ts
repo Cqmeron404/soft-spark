@@ -56,8 +56,10 @@ export async function openDb(options: OpenDbOptions = {}): Promise<OpenDbResult>
       max: process.env.VERCEL ? 1 : 8,
       idle_timeout: process.env.VERCEL ? 20 : 0,
       connect_timeout: 10,
-      // Neon/Supabase poolers (and pgbouncer) hang on prepared statements.
+      // Neon/Supabase poolers (and pgbouncer) hang on prepared statements
+      // and on the default custom-type probe.
       prepare: false,
+      fetch_types: false,
     });
     const db = drizzlePg(sql, { schema });
     return {
