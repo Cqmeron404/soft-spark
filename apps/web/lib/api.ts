@@ -1,4 +1,12 @@
-import type { MatchDetail, MatchListItem, MatchSearchResult, OnboardBody, UserDto } from "@soft-spark/shared";
+import type {
+  BotDto,
+  MatchDetail,
+  MatchListItem,
+  MatchSearchResult,
+  OnboardBody,
+  PreferredAction,
+  UserDto,
+} from "@soft-spark/shared";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
@@ -63,9 +71,32 @@ export function searchForDate() {
   });
 }
 
-export function patchBot(body: { paused?: boolean; vibeTags?: string[] }) {
-  return api<{ id: string; paused: boolean }>("/users/me/bot", {
+export function getBot() {
+  return api<BotDto>("/users/me/bot");
+}
+
+export function patchMe(body: unknown) {
+  return api<UserDto>("/users/me", {
     method: "PATCH",
     body: JSON.stringify(body),
+  });
+}
+
+export function patchBot(body: {
+  paused?: boolean;
+  vibeTags?: string[];
+  displayName?: string;
+  preferredAction?: PreferredAction;
+}) {
+  return api<BotDto>("/users/me/bot", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export function publishBot(preferredAction: PreferredAction) {
+  return api<BotDto>("/users/me/bot/publish", {
+    method: "POST",
+    body: JSON.stringify({ preferredAction }),
   });
 }

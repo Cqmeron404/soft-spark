@@ -14,6 +14,12 @@ export async function toUserDto(store: SparkStore, userId: string): Promise<User
     interestedIn: user.interestedIn,
     bio: user.bio,
     photoUrl: user.photoUrl,
+    height: user.height,
+    hairColor: user.hairColor,
+    likes: user.likes ?? [],
+    dislikes: user.dislikes ?? [],
+    job: user.job,
+    education: user.education,
     homeGeo: { lat: user.homeLat, lng: user.homeLng },
     homeTz: user.homeTz,
     prefs: {
@@ -35,6 +41,9 @@ export async function toBotDto(store: SparkStore, userId: string): Promise<BotDt
     vibeTags: bot.vibeTags,
     active: bot.active,
     paused: bot.paused,
+    displayName: bot.displayName,
+    publishedAt: bot.publishedAt,
+    preferredAction: bot.preferredAction,
   };
 }
 

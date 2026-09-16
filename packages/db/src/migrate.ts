@@ -59,6 +59,12 @@ const STATEMENTS = [
     home_tz TEXT NOT NULL DEFAULT 'America/Denver',
     bot_dating_opt_in BOOLEAN NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
+    height TEXT,
+    hair_color TEXT,
+    likes TEXT[],
+    dislikes TEXT[],
+    job TEXT,
+    education TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
@@ -68,6 +74,9 @@ const STATEMENTS = [
     vibe_tags TEXT[] NOT NULL,
     active BOOLEAN NOT NULL DEFAULT true,
     paused BOOLEAN NOT NULL DEFAULT false,
+    display_name TEXT,
+    published_at TIMESTAMPTZ,
+    preferred_action TEXT NOT NULL DEFAULT 'wait',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
   `CREATE TABLE IF NOT EXISTS "preferences" (
@@ -163,6 +172,15 @@ const STATEMENTS = [
 const ALTERS = [
   `ALTER TABLE "invites" ADD COLUMN IF NOT EXISTS carry_cue_a TEXT`,
   `ALTER TABLE "invites" ADD COLUMN IF NOT EXISTS carry_cue_b TEXT`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS height TEXT`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS hair_color TEXT`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS likes TEXT[]`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS dislikes TEXT[]`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS job TEXT`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS education TEXT`,
+  `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS display_name TEXT`,
+  `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ`,
+  `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS preferred_action TEXT`,
 ];
 
 export async function applySchema(db: SparkDb): Promise<void> {

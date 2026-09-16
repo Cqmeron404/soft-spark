@@ -280,11 +280,70 @@ async function main() {
   const maya = await json<OnboardRes>(mayaRes);
   const jordan = await json<OnboardRes>(jordanRes);
   if (!maya.user?.id || !maya.bot?.id) failures.push("maya missing user/bot");
-  const mayaProfile = await json<{ photoUrl?: string }>(
-    await app.request("/users/me", { headers: { cookie: mayaAuth.cookie } })
-  );
+  const mayaProfile = await json<{
+    photoUrl?: string;
+    height?: string;
+    likes?: string[];
+    hairColor?: string;
+  }>(await app.request("/users/me", { headers: { cookie: mayaAuth.cookie } }));
   if (mayaProfile.photoUrl !== MAYA.photoUrl) failures.push("onboard did not persist photoUrl");
   else console.log("ok  onboard Maya + Jordan (User + DatingBot + photoUrl)");
+  if (mayaProfile.height !== MAYA.profile.height || !mayaProfile.likes?.includes("pasta")) {
+    failures.push(`onboard did not persist rich profile: ${JSON.stringify(mayaProfile)}`);
+  } else console.log("ok  onboard persisted height / likes / dating-profile fields");
+
+  const mayaBot = await json<{
+    displayName?: string;
+    publishedAt?: string;
+    preferredAction?: string;
+  }>(await app.request("/users/me/bot", { headers: { cookie: mayaAuth.cookie } }));
+  if (mayaBot.displayName !== "Ember" || !mayaBot.publishedAt || mayaBot.preferredAction !== "wait") {
+    failures.push(`onboard bot name/publish missing: ${JSON.stringify(mayaBot)}`);
+  } else console.log("ok  Maya named bot Ember and published (wait)");
+
+  const leanAuth = await signUp(app, {
+    email: "lean@softspark.dev",
+    password: "spark-demo-lean",
+    name: "Lean",
+  });
+  const leanOnboard = await app.request("/users/me/onboard", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: leanAuth.cookie },
+    body: JSON.stringify({
+      botDatingOptIn: true,
+      profile: { displayName: "Lean", age: 28, gender: "woman", interestedIn: ["man"] },
+      prefs: { cuisine: ["italian"], budget: 2, maxTravelKm: 15, dealbreakers: [] },
+      homeGeo: { lat: 39.74, lng: -104.98 },
+    }),
+  });
+  if (leanOnboard.status >= 400) {
+    failures.push(`legacy onboard without new fields failed ${leanOnboard.status} ${await leanOnboard.text()}`);
+  } else console.log("ok  legacy onboard body (no botName / likes) still creates a profile");
+
+  const leanPublish = await json<{
+    publishedAt?: string;
+    preferredAction?: string;
+    displayName?: string;
+  }>(
+    await app.request("/users/me/bot/publish", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: leanAuth.cookie },
+      body: JSON.stringify({ preferredAction: "roam" }),
+    })
+  );
+  if (!leanPublish.publishedAt || leanPublish.preferredAction !== "roam") {
+    failures.push(`publish roam failed: ${JSON.stringify(leanPublish)}`);
+  } else console.log("ok  POST /users/me/bot/publish → roam");
+
+  const leanNamed = await json<{ displayName?: string }>(
+    await app.request("/users/me/bot", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: leanAuth.cookie },
+      body: JSON.stringify({ displayName: "Spark" }),
+    })
+  );
+  if (leanNamed.displayName !== "Spark") failures.push("PATCH bot displayName should stick");
+  else console.log("ok  user can name their bot after onboard");
 
   ctx.events.clear();
   const engine = await createEngine(ctx.store);

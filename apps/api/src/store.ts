@@ -38,6 +38,12 @@ export type UserRecord = {
   homeTz: string;
   botDatingOptIn: boolean;
   status: string;
+  height?: string;
+  hairColor?: string;
+  likes: string[];
+  dislikes: string[];
+  job?: string;
+  education?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -48,6 +54,9 @@ export type BotRecord = {
   vibeTags: string[];
   active: boolean;
   paused: boolean;
+  displayName?: string;
+  publishedAt?: string;
+  preferredAction: "roam" | "wait";
 };
 
 export type PreferenceRecord = {
@@ -173,6 +182,12 @@ function asUser(row: typeof users.$inferSelect): UserRecord {
     homeTz: row.homeTz,
     botDatingOptIn: row.botDatingOptIn,
     status: row.status,
+    height: row.height ?? undefined,
+    hairColor: row.hairColor ?? undefined,
+    likes: row.likes ?? [],
+    dislikes: row.dislikes ?? [],
+    job: row.job ?? undefined,
+    education: row.education ?? undefined,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
   };
@@ -185,6 +200,9 @@ function asBot(row: typeof datingBots.$inferSelect): BotRecord {
     vibeTags: row.vibeTags ?? [],
     active: row.active,
     paused: row.paused,
+    displayName: row.displayName ?? undefined,
+    publishedAt: row.publishedAt ? iso(row.publishedAt) : undefined,
+    preferredAction: row.preferredAction === "roam" ? "roam" : "wait",
   };
 }
 
@@ -299,6 +317,12 @@ export function createDbStore(db: SparkDb) {
           homeLng: input.homeLng,
           homeTz: input.homeTz,
           botDatingOptIn: input.botDatingOptIn,
+          height: input.height,
+          hairColor: input.hairColor,
+          likes: input.likes ?? [],
+          dislikes: input.dislikes ?? [],
+          job: input.job,
+          education: input.education,
         })
         .returning();
       return asUser(row);
@@ -317,6 +341,12 @@ export function createDbStore(db: SparkDb) {
             homeLat: patch.homeLat,
             homeLng: patch.homeLng,
             homeTz: patch.homeTz,
+            height: patch.height,
+            hairColor: patch.hairColor,
+            likes: patch.likes,
+            dislikes: patch.dislikes,
+            job: patch.job,
+            education: patch.education,
             updatedAt: new Date(),
           })
         )
@@ -334,6 +364,9 @@ export function createDbStore(db: SparkDb) {
           vibeTags: input.vibeTags,
           active: input.active,
           paused: input.paused,
+          displayName: input.displayName,
+          publishedAt: input.publishedAt ? new Date(input.publishedAt) : undefined,
+          preferredAction: input.preferredAction ?? "wait",
         })
         .returning();
       return asBot(row);
@@ -351,6 +384,9 @@ export function createDbStore(db: SparkDb) {
           vibeTags: patch.vibeTags ?? cur.vibeTags,
           paused: patch.paused ?? cur.paused,
           active: patch.active ?? cur.active,
+          displayName: patch.displayName ?? cur.displayName,
+          publishedAt: patch.publishedAt ? new Date(patch.publishedAt) : cur.publishedAt ? new Date(cur.publishedAt) : null,
+          preferredAction: patch.preferredAction ?? cur.preferredAction,
         })
         .where(eq(datingBots.id, cur.id))
         .returning();

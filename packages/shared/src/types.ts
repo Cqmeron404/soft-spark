@@ -18,3 +18,6 @@ export type Geo = { lat: number; lng: number };
 export type PriceTier = 1 | 2 | 3 | 4;
 
 export type LookingFor = "relationship" | "casual" | "unsure";
+
+/** After publish, roam starts stub search; wait keeps the bot ready. */
+export type PreferredAction = "roam" | "wait";

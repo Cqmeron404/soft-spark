@@ -3,6 +3,14 @@ import type { Context, Next } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { SparkDb } from "@soft-spark/db";
 import type { LookingFor, OnboardBody, PriceTier } from "@soft-spark/shared";
+import {
+  BIO_MAX,
+  BOT_NAME_MAX,
+  JOB_TEXT_MAX,
+  normalizePreferredAction,
+  normalizeShortText,
+  normalizeTagList,
+} from "@soft-spark/shared";
 import type { Auth } from "./auth.js";
 import { authMode, resolveSession } from "./auth.js";
 import type { EventLog } from "./event-log.js";
@@ -80,30 +88,32 @@ export function createApp(deps: AppDeps) {
     const session = await resolveSession(auth, db, c.req.raw.headers);
     const email = session?.user.email ?? `${authId}@users.softspark`;
     const existing = await store.userByAuthId(authId);
+    const profilePatch = {
+      displayName: profile.displayName,
+      age: profile.age,
+      gender: profile.gender,
+      interestedIn: profile.interestedIn ?? [],
+      bio: normalizeShortText(profile.bio, BIO_MAX),
+      photoUrl: body.photoUrl,
+      homeLat: body.homeGeo.lat,
+      homeLng: body.homeGeo.lng,
+      homeTz: body.homeTz ?? "America/Denver",
+      height: normalizeShortText(profile.height),
+      hairColor: normalizeShortText(profile.hairColor),
+      likes: normalizeTagList(profile.likes),
+      dislikes: normalizeTagList(profile.dislikes),
+      job: normalizeShortText(profile.job, JOB_TEXT_MAX),
+      education: normalizeShortText(profile.education, JOB_TEXT_MAX),
+    };
+    const botName = normalizeShortText(body.botName, BOT_NAME_MAX);
+    const preferredAction = normalizePreferredAction(body.preferredAction);
+    const publishedAt = body.publish ? new Date().toISOString() : undefined;
     const user = existing
-      ? await store.updateUser(existing.id, {
-          displayName: profile.displayName,
-          age: profile.age,
-          gender: profile.gender,
-          interestedIn: profile.interestedIn ?? [],
-          bio: profile.bio,
-          photoUrl: body.photoUrl,
-          homeLat: body.homeGeo.lat,
-          homeLng: body.homeGeo.lng,
-          homeTz: body.homeTz ?? "America/Denver",
-        })
+      ? await store.updateUser(existing.id, profilePatch)
       : await store.createUser({
           authId,
           email,
-          displayName: profile.displayName,
-          age: profile.age,
-          gender: profile.gender,
-          interestedIn: profile.interestedIn ?? [],
-          bio: profile.bio,
-          photoUrl: body.photoUrl,
-          homeLat: body.homeGeo.lat,
-          homeLng: body.homeGeo.lng,
-          homeTz: body.homeTz ?? "America/Denver",
+          ...profilePatch,
           botDatingOptIn: true,
         });
 
@@ -113,9 +123,17 @@ export function createApp(deps: AppDeps) {
         vibeTags: body.vibeTags ?? [],
         active: true,
         paused: false,
+        displayName: botName,
+        publishedAt,
+        preferredAction,
       });
-    } else if (body.vibeTags) {
-      await store.updateBot(user.id, { vibeTags: body.vibeTags });
+    } else {
+      await store.updateBot(user.id, {
+        vibeTags: body.vibeTags,
+        displayName: botName,
+        publishedAt,
+        preferredAction: body.preferredAction ? preferredAction : undefined,
+      });
     }
 
     try {
@@ -165,10 +183,20 @@ export function createApp(deps: AppDeps) {
         age: body.profile?.age,
         gender: body.profile?.gender,
         interestedIn: body.profile?.interestedIn,
-        bio: body.profile?.bio,
+        bio: body.profile?.bio !== undefined ? normalizeShortText(body.profile.bio, BIO_MAX) : undefined,
         photoUrl: body.photoUrl ?? body.profile?.photoUrl,
         homeLat: body.homeGeo?.lat,
         homeLng: body.homeGeo?.lng,
+        height: body.profile?.height !== undefined ? normalizeShortText(body.profile.height) : undefined,
+        hairColor:
+          body.profile?.hairColor !== undefined ? normalizeShortText(body.profile.hairColor) : undefined,
+        likes: body.profile?.likes !== undefined ? normalizeTagList(body.profile.likes) : undefined,
+        dislikes: body.profile?.dislikes !== undefined ? normalizeTagList(body.profile.dislikes) : undefined,
+        job: body.profile?.job !== undefined ? normalizeShortText(body.profile.job, JOB_TEXT_MAX) : undefined,
+        education:
+          body.profile?.education !== undefined
+            ? normalizeShortText(body.profile.education, JOB_TEXT_MAX)
+            : undefined,
       });
     }
     if (body.prefs) {
@@ -200,13 +228,28 @@ export function createApp(deps: AppDeps) {
       vibeTags: Array.isArray(body.vibeTags) ? body.vibeTags : undefined,
       paused: typeof body.paused === "boolean" ? body.paused : undefined,
       active: typeof body.active === "boolean" ? body.active : undefined,
+      displayName:
+        body.displayName !== undefined ? normalizeShortText(body.displayName, BOT_NAME_MAX) : undefined,
+      preferredAction: body.preferredAction ? normalizePreferredAction(body.preferredAction) : undefined,
     });
-    return c.json({
-      id: payload.id,
-      vibeTags: payload.vibeTags,
-      active: payload.active,
-      paused: payload.paused,
+    return c.json(await toBotDto(store, userId));
+  });
+
+  app.post("/users/me/bot/publish", async (c) => {
+    const userId = c.get("userId");
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    const bot = await store.botForUser(userId);
+    if (!bot) return c.json({ error: "not_found" }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { preferredAction?: string };
+    const preferredAction = normalizePreferredAction(body.preferredAction);
+    await store.updateBot(userId, {
+      preferredAction,
+      publishedAt: bot.publishedAt ?? new Date().toISOString(),
+      active: true,
     });
+    const payload = await toBotDto(store, userId);
+    assertClientSafe(payload);
+    return c.json(payload);
   });
 
   app.post("/users/me/push", async (c) => {

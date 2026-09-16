@@ -45,7 +45,7 @@ export function BotSearchCard(props: {
             ? "Still looking"
             : searching
               ? "Your bot is out"
-              : "Let the bot search for your date"}
+              : "Roam / find a match"}
       </p>
       <p style={{ margin: 0, color: "var(--ss-text-muted)", lineHeight: 1.45 }}>
         {props.phase === "found"
@@ -54,7 +54,7 @@ export function BotSearchCard(props: {
             ? "No date yet — your bot will keep looking. Try again in a moment."
             : searching
               ? searchLineForElapsed(elapsed)
-              : "We’ll look for a suitable match and bring you the invite — no chat transcripts."}
+              : "Send your bot to search for a blind date. You’ll only see a status band and an invite — never the chat."}
       </p>
       {searching ? (
         <p style={{ margin: 0, fontSize: 14, color: "var(--ss-text)" }} aria-live="polite">
@@ -69,7 +69,7 @@ export function BotSearchCard(props: {
           disabled={props.disabled}
           onClick={props.onSearch}
         >
-          Let the bot search for your date
+          Roam / find a match
         </button>
       ) : null}
     </div>

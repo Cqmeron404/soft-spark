@@ -78,6 +78,12 @@ export const users = pgTable("users", {
   homeTz: text("home_tz").notNull().default("America/Denver"),
   botDatingOptIn: boolean("bot_dating_opt_in").notNull(),
   status: text("status").notNull().default("active"),
+  height: text("height"),
+  hairColor: text("hair_color"),
+  likes: text("likes").array(),
+  dislikes: text("dislikes").array(),
+  job: text("job"),
+  education: text("education"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -90,6 +96,9 @@ export const datingBots = pgTable("dating_bots", {
   vibeTags: text("vibe_tags").array().notNull(),
   active: boolean("active").notNull().default(true),
   paused: boolean("paused").notNull().default(false),
+  displayName: text("display_name"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  preferredAction: text("preferred_action").notNull().default("wait"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -15,6 +15,7 @@ function isLiveMatch(state: string) {
 
 export default function MatchesPage() {
   const router = useRouter();
+  const [autoRoam, setAutoRoam] = useState(false);
   const [items, setItems] = useState<MatchListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ matchId: string } | null>(null);
@@ -36,6 +37,7 @@ export default function MatchesPage() {
   }
 
   useEffect(() => {
+    setAutoRoam(new URLSearchParams(window.location.search).get("roam") === "1");
     void load();
   }, []);
 
@@ -58,6 +60,7 @@ export default function MatchesPage() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 13, fontWeight: 600 }}>Roam</p>
       <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>
         Your bots are out
       </h1>
@@ -71,7 +74,7 @@ export default function MatchesPage() {
         />
       ) : null}
       {error ? <p className="ss-error">{error === "unauthorized" ? "Sign in to keep your bot dating" : error}</p> : null}
-      {showSearch ? <BotSearchAction /> : null}
+      {showSearch ? <BotSearchAction autoStart={autoRoam} /> : null}
       <div style={{ display: "grid", gap: 12 }}>
         {items?.map((m) => (
           <MatchCard

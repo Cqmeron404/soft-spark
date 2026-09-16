@@ -10,3 +10,5 @@ export { RevealSheet } from "./RevealSheet";
 export { ConnectingCaption, SoftToast, PhotoCrop, EmptyState, SoftError } from "./chrome";
 export { BotSearchCard, searchLineForElapsed } from "./BotSearchCard";
 export type { BotSearchPhase } from "./BotSearchCard";
+export { TabBar, TabVisual } from "./TabBar";
+export type { TabItem } from "./TabBar";

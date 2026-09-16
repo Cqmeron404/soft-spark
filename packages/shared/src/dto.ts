@@ -4,6 +4,7 @@ import type {
   InviteStatus,
   InviteUserStatus,
   MatchState,
+  PreferredAction,
   PriceTier,
 } from "./types";
 
@@ -70,6 +71,10 @@ export type BotDto = {
   vibeTags: string[];
   active: boolean;
   paused: boolean;
+  /** User-chosen bot name. Falls back to "{displayName}'s bot" in UI if missing. */
+  displayName?: string;
+  publishedAt?: string;
+  preferredAction: PreferredAction;
 };
 
 export type UserDto = {
@@ -80,6 +85,12 @@ export type UserDto = {
   interestedIn: string[];
   bio?: string;
   photoUrl?: string;
+  height?: string;
+  hairColor?: string;
+  likes: string[];
+  dislikes: string[];
+  job?: string;
+  education?: string;
   homeGeo: Geo;
   homeTz: string;
   prefs: {
@@ -88,6 +99,7 @@ export type UserDto = {
     maxTravelKm: number;
     dealbreakers: string[];
     lookingFor: string;
+    /** Shown as hobbies in the dating-profile UI. */
     interests: string[];
   };
 };
@@ -100,6 +112,12 @@ export type OnboardBody = {
     gender: string;
     interestedIn: string[];
     bio?: string;
+    height?: string;
+    hairColor?: string;
+    likes?: string[];
+    dislikes?: string[];
+    job?: string;
+    education?: string;
   };
   prefs: {
     cuisine: string[];
@@ -113,4 +131,13 @@ export type OnboardBody = {
   homeTz?: string;
   vibeTags?: string[];
   photoUrl?: string;
+  /** Name the dating bot — required for a complete first-time create. */
+  botName?: string;
+  /** If true, sets publishedAt during onboard. */
+  publish?: boolean;
+  preferredAction?: PreferredAction;
+};
+
+export type PublishBotBody = {
+  preferredAction: PreferredAction;
 };

@@ -16,18 +16,27 @@ export function matchHref(match: MatchDetail): string {
   return "/matches";
 }
 
-export function BotSearchAction() {
+export function BotSearchAction(props: { autoStart?: boolean }) {
   const router = useRouter();
   const [phase, setPhase] = useState<BotSearchPhase>("idle");
   const [remaining, setRemaining] = useState<number>(BOT_SEARCH_ETA.typicalSeconds);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
+  const autoStarted = useRef(false);
 
   useEffect(() => {
     return () => {
       if (timer.current) window.clearInterval(timer.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!props.autoStart || autoStarted.current) return;
+    autoStarted.current = true;
+    void run();
+    // Start once when arriving from publish → roam.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.autoStart]);
 
   async function run() {
     setError(null);

@@ -139,7 +139,37 @@ async function ensureOnboarded(
 ): Promise<{ id: string; displayName: string }> {
   const me = await app.request("/users/me", { headers });
   if (me.status === 200) {
-    return json(me);
+    const current = await json<{ id: string; displayName: string; height?: string }>(me);
+    if (!current.height) {
+      await app.request("/users/me", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          profile: onboard.profile,
+          photoUrl: onboard.photoUrl,
+        }),
+      });
+    }
+    const botRes = await app.request("/users/me/bot", { headers });
+    const bot =
+      botRes.status === 200
+        ? await json<{ displayName?: string; publishedAt?: string }>(botRes)
+        : undefined;
+    if (onboard.botName && bot?.displayName !== onboard.botName) {
+      await app.request("/users/me/bot", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ displayName: onboard.botName, vibeTags: onboard.vibeTags }),
+      });
+    }
+    if (onboard.publish && !bot?.publishedAt) {
+      await app.request("/users/me/bot/publish", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ preferredAction: onboard.preferredAction ?? "wait" }),
+      });
+    }
+    return current;
   }
   if (me.status !== 404) {
     throw new Error(`demo /users/me failed ${me.status} ${await me.text()}`);

@@ -22,6 +22,12 @@ export const DEMO_MAYA_ONBOARD: OnboardBody = {
     gender: "woman",
     interestedIn: ["man"],
     bio: "Denver nights, italian food",
+    height: "5'6\"",
+    hairColor: "dark brown",
+    likes: ["pasta", "live music", "late walks"],
+    dislikes: ["cigarettes", "ghosting"],
+    job: "product designer",
+    education: "CU Boulder",
   },
   prefs: {
     cuisine: ["italian", "american"],
@@ -35,6 +41,9 @@ export const DEMO_MAYA_ONBOARD: OnboardBody = {
   homeTz: "America/Denver",
   vibeTags: ["Curious", "Soft"],
   photoUrl: "https://cdn.softspark.dev/maya.jpg",
+  botName: "Ember",
+  publish: true,
+  preferredAction: "wait",
 };
 
 export const DEMO_JORDAN_ONBOARD: OnboardBody = {
@@ -45,6 +54,12 @@ export const DEMO_JORDAN_ONBOARD: OnboardBody = {
     gender: "man",
     interestedIn: ["woman"],
     bio: "LoHi, long walks, pasta",
+    height: "5'11\"",
+    hairColor: "brown",
+    likes: ["pasta", "design", "hiking"],
+    dislikes: ["loud bars", "tardiness"],
+    job: "architect",
+    education: "RISD",
   },
   prefs: {
     cuisine: ["italian", "american"],
@@ -57,4 +72,7 @@ export const DEMO_JORDAN_ONBOARD: OnboardBody = {
   homeGeo: { lat: 39.759, lng: -104.999 },
   homeTz: "America/Denver",
   vibeTags: ["Curious", "Witty"],
+  botName: "Nico",
+  publish: true,
+  preferredAction: "wait",
 };

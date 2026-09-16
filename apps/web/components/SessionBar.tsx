@@ -21,30 +21,36 @@ export function SessionBar() {
   }, [pathname]);
 
   const authPage = pathname.startsWith("/auth/") || pathname === "/signin" || pathname === "/signup";
-  const homeHref = current ? "/matches" : "/";
+  const homeHref = current ? "/" : "/";
+  const initial = current?.displayName.trim().slice(0, 1).toUpperCase() || "?";
 
   return (
-    <header
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        gap: 12,
-        alignItems: "center",
-        padding: "12px 20px",
-        borderBottom: "1px solid var(--ss-border)",
-      }}
-    >
+    <header className="ss-phone-header">
       <BrandMark href={homeHref} />
       <nav style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--ss-text-muted)" }}>
         {!authPage && !current ? <Link href="/auth/sign-in">Sign in</Link> : null}
         {current ? (
           <>
-            <span>{current.displayName}</span>
-            <Link href="/onboard">Profile</Link>
+            <span
+              aria-hidden
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 999,
+                background: "var(--ss-accent)",
+                color: "var(--ss-text)",
+                display: "grid",
+                placeItems: "center",
+                fontWeight: 700,
+                fontSize: 13,
+              }}
+            >
+              {initial}
+            </span>
             <button
               type="button"
               className="ss-btn ss-btn-ghost"
-              style={{ minHeight: 32 }}
+              style={{ minHeight: 32, padding: "0 10px", fontSize: 13 }}
               onClick={async () => {
                 await signOut();
                 clearSession();
