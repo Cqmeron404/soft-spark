@@ -29,7 +29,7 @@ export default function SignUpPage() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <AppLogo variant="wordmark" size={40} />
+      <AppLogo variant="wordmark" size={72} />
       <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 32, margin: 0 }}>Join Soft Spark</h1>
       <label style={{ display: "grid", gap: 6 }}>
         Name

@@ -2,7 +2,7 @@
 
 import { BRAND_ASSETS, PRODUCT_NAME } from "./brand";
 
-export type AppLogoVariant = "mark" | "wordmark" | "favicon";
+export type AppLogoVariant = "mark" | "wordmark" | "favicon" | "lockup";
 
 export function AppLogo(props: {
   variant?: AppLogoVariant;
@@ -14,13 +14,22 @@ export function AppLogo(props: {
   const src =
     variant === "wordmark"
       ? BRAND_ASSETS.wordmark
-      : variant === "favicon"
-        ? BRAND_ASSETS.favicon
-        : props.onDark
-          ? BRAND_ASSETS.markOnDark
-          : BRAND_ASSETS.markTransparent;
-  const height = props.size ?? (variant === "wordmark" ? 36 : variant === "favicon" ? 32 : 24);
-  const width = variant === "wordmark" ? Math.round((height * 420) / 96) : height;
+      : variant === "lockup"
+        ? BRAND_ASSETS.lockup
+        : variant === "favicon"
+          ? BRAND_ASSETS.favicon
+          : props.onDark
+            ? BRAND_ASSETS.markOnDark
+            : BRAND_ASSETS.markTransparent;
+  const height =
+    props.size ??
+    (variant === "lockup" ? 96 : variant === "wordmark" ? 48 : variant === "favicon" ? 32 : 24);
+  const width =
+    variant === "wordmark"
+      ? Math.round((height * 840) / 400)
+      : variant === "lockup"
+        ? Math.round((height * 1200) / 743)
+        : height;
   return (
     <img
       src={src}
@@ -31,7 +40,7 @@ export function AppLogo(props: {
         display: "block",
         width,
         height,
-        borderRadius: variant === "wordmark" ? 0 : 8,
+        borderRadius: variant === "wordmark" || variant === "lockup" ? 0 : 8,
         objectFit: "contain",
       }}
     />
