@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Image,
   Pressable,
@@ -9,7 +9,20 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { acceptInvite, api, declineInvite, getToken, setToken, signIn, signUp } from "./src/api";
+import { formatMilesFromKm } from "@soft-spark/shared";
+import { DualStatusRow, InviteActions } from "./src/DualStatusRow";
+import { PhotoStep } from "./src/PhotoStep";
+import {
+  acceptInvite,
+  api,
+  declineInvite,
+  getToken,
+  registerPush,
+  setToken,
+  signIn,
+  signUp,
+  type MatchLike,
+} from "./src/api";
 
 type Screen =
   | "signin"
@@ -19,20 +32,7 @@ type Screen =
   | "reveal"
   | "invite";
 
-type MatchItem = {
-  id: string;
-  state: string;
-  band: string;
-  reasons: string[];
-  peer?: { displayName: string };
-  invite?: {
-    id: string;
-    you: string;
-    them: string;
-    venue: { name: string; cuisine: string; travelKmYou: number; travelKmThem: number; approxNeighborhood: string };
-    window: { label: string };
-  };
-};
+type MatchItem = MatchLike;
 
 const CREAM = "#F7F1EA";
 const SURFACE = "#FFF8F2";
@@ -47,11 +47,12 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [optIn, setOptIn] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>();
   const [photoSkipped, setPhotoSkipped] = useState(false);
+  const [doneOnboard, setDoneOnboard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [matches, setMatches] = useState<MatchItem[]>([]);
   const [active, setActive] = useState<MatchItem | null>(null);
-  const initials = useMemo(() => (name.trim()[0] ?? "?").toUpperCase(), [name]);
 
   async function loadMatches() {
     const items = await api<MatchItem[]>("/matches");
@@ -63,9 +64,24 @@ export default function App() {
       await api("/users/me");
       setScreen("matches");
       await loadMatches();
+      void registerExpoPush();
     } catch (err) {
       if ((err as { status?: number }).status === 404) setScreen("onboard");
       else setError(err instanceof Error ? err.message : "Auth failed");
+    }
+  }
+
+  async function registerExpoPush() {
+    try {
+      const Notifications = await import("expo-notifications");
+      const Device = await import("expo-device");
+      if (!Device.isDevice) return;
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") return;
+      const tokenRes = await Notifications.getExpoPushTokenAsync();
+      await registerPush(tokenRes.data);
+    } catch {
+      /* push optional until Expo secrets / device */
     }
   }
 
@@ -134,14 +150,19 @@ export default function App() {
 
       {screen === "onboard" ? (
         <View style={styles.stack}>
+          {doneOnboard ? (
+            <Text style={styles.h1}>Your bot’s ready. We’ll ping you when chemistry builds</Text>
+          ) : (
+            <>
           <Text style={styles.h1}>Let’s build your dating bot</Text>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-          <Text style={styles.muted}>Add a photo so your invite feels human</Text>
-          <Pressable onPress={() => setPhotoSkipped(true)}>
-            <Text style={styles.link}>{photoSkipped ? "Using initials for now" : "Skip for now"}</Text>
-          </Pressable>
+          <PhotoStep
+            name={name}
+            value={photoUrl}
+            onChange={(uri) => {
+              setPhotoUrl(uri);
+              setPhotoSkipped(!uri);
+            }}
+          />
           <Field label="Name" value={name} onChange={setName} />
           <Pressable onPress={() => setOptIn(!optIn)}>
             <Text style={styles.body}>{optIn ? "☑" : "☐"} I want an AI bot to date on my behalf</Text>
@@ -168,15 +189,23 @@ export default function App() {
                     homeGeo: { lat: 39.739, lng: -104.979 },
                     homeTz: "America/Denver",
                     vibeTags: ["Curious"],
+                    photoUrl,
+                    photoSkipped,
                   }),
                 });
-                setScreen("matches");
-                await loadMatches();
+                setDoneOnboard(true);
+                void registerExpoPush();
+                setTimeout(() => {
+                  setScreen("matches");
+                  void loadMatches();
+                }, 1200);
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Onboard failed");
               }
             }}
           />
+            </>
+          )}
         </View>
       ) : null}
 
@@ -241,32 +270,48 @@ export default function App() {
       ) : null}
 
       {screen === "invite" && active?.invite ? (
-        <View style={styles.stack}>
-          <Text style={styles.h1}>{active.invite.venue.name}</Text>
-          <Text style={styles.muted}>
-            {(active.invite.venue.travelKmYou * 0.621371).toFixed(1)} mi from you ·{" "}
-            {(active.invite.venue.travelKmThem * 0.621371).toFixed(1)} mi from them
-          </Text>
-          <Text style={styles.body}>You: {active.invite.you}</Text>
-          <Text style={styles.body}>Them: {active.invite.them}</Text>
-          <Btn
-            label="I’m in"
-            onPress={async () => {
-              const next = await acceptInvite(active.id, active.invite!.id);
-              setActive(next);
-            }}
-          />
-          <Pressable
-            onPress={async () => {
-              const next = await declineInvite(active.id, active.invite!.id);
-              setActive(next);
-            }}
-          >
-            <Text style={styles.link}>Pass</Text>
-          </Pressable>
-        </View>
+        <InviteScreen active={active} setActive={setActive} />
       ) : null}
     </ScrollView>
+  );
+}
+
+function InviteScreen(props: {
+  active: MatchItem;
+  setActive: (m: MatchItem) => void;
+}) {
+  const { active, setActive } = props;
+  const invite = active.invite!;
+  const expired = Boolean(invite.window.end && Date.parse(invite.window.end) < Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      void api<MatchItem>(`/matches/${active.id}`).then(setActive);
+    }, 2500);
+    return () => clearInterval(t);
+  }, [active.id, setActive]);
+
+  return (
+    <View style={styles.stack}>
+      <Text style={styles.h1}>{invite.venue.name}</Text>
+      <Text style={styles.muted}>
+        {formatMilesFromKm(invite.venue.travelKmYou)} mi from you · {formatMilesFromKm(invite.venue.travelKmThem)} mi from
+        them
+      </Text>
+      <DualStatusRow
+        themName={active.peer?.displayName ?? "Them"}
+        you={invite.you}
+        them={invite.them}
+        expired={expired}
+      />
+      <InviteActions
+        you={invite.you}
+        them={invite.them}
+        expired={expired}
+        onAccept={async () => setActive(await acceptInvite(active.id, invite.id))}
+        onPass={async () => setActive(await declineInvite(active.id, invite.id))}
+      />
+    </View>
   );
 }
 

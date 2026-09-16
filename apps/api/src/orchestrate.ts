@@ -19,8 +19,10 @@ import {
   type SafetyGate,
   type VenueSuggester,
 } from "@soft-spark/match-engine";
-import { EVENTS, isHomeCardReason, type ClientRealtimeEvent } from "@soft-spark/shared";
+import { EVENTS, isClientPushType, isHomeCardReason, type ClientRealtimeEvent } from "@soft-spark/shared";
 import type { EventLog } from "./event-log.js";
+import { assertPlacesInProd, isProduction } from "./env.js";
+import type { PushDispatcher } from "./push.js";
 import type { RealtimeHub } from "./realtime.js";
 import { snapshotFor } from "./snapshot.js";
 import type { MatchRecord, SparkStore } from "./store.js";
@@ -38,22 +40,24 @@ export async function createEngine(
   options?: { emptyVenues?: boolean }
 ): Promise<Engine> {
   const stubRunner = createStubConversationRunner();
-  const modeLlm = llmConfigured({
-    MATCH_ENGINE_MODE: process.env.MATCH_ENGINE_MODE,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-  });
-  const runner = modeLlm
-    ? createLlmConversationRunner(
-        {
-          apiKey: process.env.OPENAI_API_KEY,
-          baseUrl: process.env.OPENAI_BASE_URL,
-          model: process.env.OPENAI_MODEL,
-        },
-        stubRunner
-      )
-    : stubRunner;
-  const catalog = await store.listCatalog();
+  const modeLlm = process.env.MATCH_ENGINE_MODE === "llm";
+  const runner =
+    modeLlm && llmConfigured({
+      MATCH_ENGINE_MODE: process.env.MATCH_ENGINE_MODE,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    })
+      ? createLlmConversationRunner(
+          {
+            apiKey: process.env.OPENAI_API_KEY,
+            baseUrl: process.env.OPENAI_BASE_URL,
+            model: process.env.OPENAI_MODEL,
+          },
+          stubRunner
+        )
+      : stubRunner;
+  const catalog = isProduction() ? [] : await store.listCatalog();
   const googleKey = process.env.GOOGLE_PLACES_API_KEY;
+  assertPlacesInProd(process.env, { emptyVenues: options?.emptyVenues });
   const provider = googleKey
     ? createGooglePlaceProvider({ apiKey: googleKey })
     : createCatalogPlaceProvider(catalog);
@@ -81,7 +85,8 @@ async function publishClient(
   store: SparkStore,
   hub: RealtimeHub | undefined,
   type: ClientRealtimeEvent["type"],
-  matchId: string
+  matchId: string,
+  push?: PushDispatcher
 ) {
   if (!hub) return;
   const match = await store.getMatch(matchId);
@@ -103,6 +108,9 @@ async function publishClient(
       : undefined,
   };
   await hub.publish([match.userAId, match.userBId], event);
+  if (push && isClientPushType(type)) {
+    await push.notify([match.userAId, match.userBId], event);
+  }
 }
 
 export async function orchestrateMatch(input: {
@@ -112,8 +120,9 @@ export async function orchestrateMatch(input: {
   userAId: string;
   userBId: string;
   hub?: RealtimeHub;
+  push?: PushDispatcher;
 }): Promise<MatchRecord> {
-  const { store, events, engine, hub } = input;
+  const { store, events, engine, hub, push } = input;
   if (input.userAId === input.userBId) {
     throw Object.assign(new Error("cannot match a user with themselves"), {
       status: 400,
@@ -202,6 +211,9 @@ export async function orchestrateMatch(input: {
       text: result.text,
       safety,
     });
+    if (result.fallback) {
+      events.emit(EVENTS.BOT_TURN_FALLBACK, { matchId: match.id, botId: bot.id });
+    }
 
     if (!safety.ok) {
       await store.updateMatch(match.id, {
@@ -261,7 +273,7 @@ export async function orchestrateMatch(input: {
     band: scored.band,
     reasons: homeReasons,
   });
-  await publishClient(store, hub, "match.score.updated", match.id);
+  await publishClient(store, hub, "match.score.updated", match.id, push);
 
   const userA = await store.getUser(input.userAId);
   const userB = await store.getUser(input.userBId);
@@ -291,7 +303,7 @@ export async function orchestrateMatch(input: {
         confidence: scored.confidence,
       });
       match = await store.updateMatch(match.id, { state: "exploring" });
-      await publishClient(store, hub, "match.venue_unavailable", match.id);
+      await publishClient(store, hub, "match.venue_unavailable", match.id, push);
       return match;
     }
     if (gate.ok) {
@@ -301,7 +313,7 @@ export async function orchestrateMatch(input: {
         matchId: match.id,
         venueCandidates: suggested.candidates,
       });
-      await publishClient(store, hub, "match.invite_ready", match.id);
+      await publishClient(store, hub, "match.invite_ready", match.id, push);
       const venue = await store.createVenue({
         name: pick.name,
         cuisine: pick.cuisine,
@@ -338,7 +350,7 @@ export async function orchestrateMatch(input: {
         window,
       });
       match = await store.updateMatch(match.id, { state: "invited" });
-      await publishClient(store, hub, "invite.sent", match.id);
+      await publishClient(store, hub, "invite.sent", match.id, push);
       return match;
     }
   }
@@ -354,6 +366,7 @@ export async function respondInvite(input: {
   userId: string;
   action: "accept" | "decline";
   hub?: RealtimeHub;
+  push?: PushDispatcher;
 }): Promise<{ match: MatchRecord }> {
   const match = await input.store.getMatch(input.matchId);
   const invite = await input.store.getInvite(input.inviteId);
@@ -390,11 +403,11 @@ export async function respondInvite(input: {
         inviteId: invite.id,
       });
       const booked = await input.store.updateMatch(match.id, { state: "booked" });
-      await publishClient(input.store, input.hub, "invite.booked", match.id);
+      await publishClient(input.store, input.hub, "invite.booked", match.id, input.push);
       return { match: booked };
     }
     await input.store.updateInvite(invite.id, { userAStatus, userBStatus });
-    await publishClient(input.store, input.hub, "invite.accepted", match.id);
+    await publishClient(input.store, input.hub, "invite.accepted", match.id, input.push);
     return { match: (await input.store.getMatch(match.id))! };
   }
 
@@ -416,6 +429,6 @@ export async function respondInvite(input: {
     userId: input.userId,
   });
   const declined = await input.store.updateMatch(match.id, { state: "declined" });
-  await publishClient(input.store, input.hub, "invite.declined", match.id);
+  await publishClient(input.store, input.hub, "invite.declined", match.id, input.push);
   return { match: declined };
 }

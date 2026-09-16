@@ -3,6 +3,7 @@ import { Fraunces, Inter } from "next/font/google";
 import "@soft-spark/ui/tokens.css";
 import "./globals.css";
 import { SessionBar } from "@/components/SessionBar";
+import { PushOptIn } from "@/components/PushOptIn";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces" });
@@ -25,6 +26,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`ss-page ${inter.variable} ${fraunces.variable}`}>
         <SessionBar />
+        <PushOptIn />
         <main style={{ maxWidth: 560, margin: "0 auto", padding: 20 }}>{children}</main>
       </body>
     </html>

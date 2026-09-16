@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export function ConnectingCaption({ live }: { live: boolean }) {
   if (live) return null;
   return (
@@ -54,6 +56,7 @@ export function PhotoCrop(props: {
   value?: string;
   onChange: (dataUrl: string | undefined) => void;
 }) {
+  const [nudge, setNudge] = useState(false);
   const initials = props.name.trim().slice(0, 1).toUpperCase() || "?";
   return (
     <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>
@@ -69,7 +72,9 @@ export function PhotoCrop(props: {
           placeItems: "center",
           fontSize: 42,
           fontWeight: 600,
-          border: "4px solid #FFF8F2",
+          backgroundColor: props.value ? "#FFF8F2" : "#E8A598",
+          border: "4px solid #E8A598",
+          boxShadow: "0 0 0 4px #FFF8F2",
           backgroundImage: props.value ? `url(${props.value})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
@@ -77,10 +82,13 @@ export function PhotoCrop(props: {
       >
         {props.value ? null : initials}
       </div>
-      <p style={{ margin: 0, color: "var(--ss-text-muted)", textAlign: "center" }}>
+      <p style={{ margin: 0, fontWeight: 600, textAlign: "center" }}>
         Add a photo so your invite feels human
       </p>
-      <label className="ss-btn ss-btn-ghost" style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
+      <p style={{ margin: 0, color: "var(--ss-text-muted)", textAlign: "center", fontSize: 14 }}>
+        Soft circle crop · cream frame · coral blush ring
+      </p>
+      <label className="ss-btn ss-btn-primary" style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
         Choose photo
         <input
           type="file"
@@ -89,15 +97,57 @@ export function PhotoCrop(props: {
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => props.onChange(String(reader.result));
-            reader.readAsDataURL(file);
+            void cropToCircle(file).then((url) => {
+              props.onChange(url);
+              setNudge(false);
+            });
+            e.target.value = "";
           }}
         />
       </label>
-      <button type="button" className="ss-btn ss-btn-ghost" onClick={() => props.onChange(undefined)}>
-        Skip for now
+      <button
+        type="button"
+        className="ss-btn ss-btn-ghost"
+        onClick={() => {
+          props.onChange(undefined);
+          setNudge(true);
+        }}
+      >
+        Use initials for now
       </button>
+      {nudge && !props.value ? (
+        <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 13, textAlign: "center" }}>
+          A photo makes the invite warmer
+        </p>
+      ) : null}
     </div>
   );
+}
+
+async function cropToCircle(file: File): Promise<string> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const size = Math.min(bitmap.width, bitmap.height);
+    const sx = (bitmap.width - size) / 2;
+    const sy = (bitmap.height - size) / 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = 360;
+    canvas.height = 360;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("canvas");
+    ctx.beginPath();
+    ctx.arc(180, 180, 180, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(bitmap, sx, sy, size, size, 0, 0, 360, 360);
+    bitmap.close();
+    return canvas.toDataURL("image/jpeg", 0.88);
+  } catch {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
 }

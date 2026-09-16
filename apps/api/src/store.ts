@@ -7,6 +7,7 @@ import {
   matches,
   messages,
   preferences,
+  pushDevices,
   users,
   venueCatalog,
   venues,
@@ -119,6 +120,30 @@ export type InviteRecord = {
   why: string;
   createdAt: string;
 };
+
+export type PushDeviceRecord = {
+  id: string;
+  userId: string;
+  platform: "web" | "expo";
+  endpoint?: string;
+  p256dh?: string;
+  auth?: string;
+  expoToken?: string;
+  createdAt: string;
+};
+
+function asPush(row: typeof pushDevices.$inferSelect): PushDeviceRecord {
+  return {
+    id: row.id,
+    userId: row.userId,
+    platform: row.platform === "expo" ? "expo" : "web",
+    endpoint: row.endpoint ?? undefined,
+    p256dh: row.p256dh ?? undefined,
+    auth: row.auth ?? undefined,
+    expoToken: row.expoToken ?? undefined,
+    createdAt: iso(row.createdAt),
+  };
+}
 
 function iso(d: Date | string): string {
   return d instanceof Date ? d.toISOString() : new Date(d).toISOString();
@@ -540,6 +565,56 @@ export function createDbStore(db: SparkDb) {
     async lastUserIds(n = 2): Promise<string[]> {
       const rows = await db.select().from(users).orderBy(desc(users.createdAt));
       return rows.slice(0, n).reverse().map((u) => u.id);
+    },
+    async upsertPushDevice(input: {
+      userId: string;
+      platform: "web" | "expo";
+      endpoint?: string;
+      p256dh?: string;
+      auth?: string;
+      expoToken?: string;
+    }): Promise<PushDeviceRecord> {
+      if (input.platform === "web" && input.endpoint) {
+        const [existing] = await db
+          .select()
+          .from(pushDevices)
+          .where(and(eq(pushDevices.userId, input.userId), eq(pushDevices.endpoint, input.endpoint)));
+        if (existing) {
+          const [row] = await db
+            .update(pushDevices)
+            .set({ p256dh: input.p256dh, auth: input.auth, platform: "web" })
+            .where(eq(pushDevices.id, existing.id))
+            .returning();
+          return asPush(row);
+        }
+      }
+      if (input.platform === "expo" && input.expoToken) {
+        const [existing] = await db
+          .select()
+          .from(pushDevices)
+          .where(and(eq(pushDevices.userId, input.userId), eq(pushDevices.expoToken, input.expoToken)));
+        if (existing) return asPush(existing);
+      }
+      const [row] = await db
+        .insert(pushDevices)
+        .values({
+          id: randomUUID(),
+          userId: input.userId,
+          platform: input.platform,
+          endpoint: input.endpoint,
+          p256dh: input.p256dh,
+          auth: input.auth,
+          expoToken: input.expoToken,
+        })
+        .returning();
+      return asPush(row);
+    },
+    async listPushDevices(userId: string): Promise<PushDeviceRecord[]> {
+      const rows = await db.select().from(pushDevices).where(eq(pushDevices.userId, userId));
+      return rows.map(asPush);
+    },
+    async deletePushDevice(userId: string, id: string): Promise<void> {
+      await db.delete(pushDevices).where(and(eq(pushDevices.id, id), eq(pushDevices.userId, userId)));
     },
   };
 }

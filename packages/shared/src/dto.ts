@@ -10,6 +10,7 @@ import type {
 /** Client match list/detail — band + state only, never raw confidence. */
 export type PeerCard = {
   displayName: string;
+  photoUrl?: string;
 };
 
 export type VenueCard = {

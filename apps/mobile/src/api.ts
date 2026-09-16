@@ -1,3 +1,5 @@
+import { formatMilesFromKm, type InviteUserStatus } from "@soft-spark/shared";
+
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8787";
 
 let token: string | null = null;
@@ -49,16 +51,25 @@ export function declineInvite(matchId: string, inviteId: string) {
   return api<MatchLike>(`/matches/${matchId}/invites/${inviteId}/decline`, { method: "POST" });
 }
 
-type MatchLike = {
+export function registerPush(expoToken: string) {
+  return api<{ id: string }>("/users/me/push", {
+    method: "POST",
+    body: JSON.stringify({ platform: "expo", expoToken }),
+  });
+}
+
+export { formatMilesFromKm };
+
+export type MatchLike = {
   id: string;
   state: string;
   band: string;
   reasons: string[];
-  peer?: { displayName: string };
+  peer?: { displayName: string; photoUrl?: string };
   invite?: {
     id: string;
-    you: string;
-    them: string;
+    you: InviteUserStatus;
+    them: InviteUserStatus;
     venue: {
       name: string;
       cuisine: string;
@@ -66,7 +77,7 @@ type MatchLike = {
       travelKmThem: number;
       approxNeighborhood: string;
     };
-    window: { label: string };
+    window: { label: string; end?: string };
   };
 };
 

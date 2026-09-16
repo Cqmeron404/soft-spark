@@ -1,6 +1,8 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import type { InviteUserStatus } from "@soft-spark/shared";
+import { dualStatusSummary } from "@soft-spark/shared";
 import { tokens } from "./tokens";
 
 export function DualStatusRow(props: {
@@ -8,63 +10,86 @@ export function DualStatusRow(props: {
   themName: string;
   you: InviteUserStatus;
   them: InviteUserStatus;
+  expired?: boolean;
 }) {
+  const key = `${props.you}-${props.them}-${props.expired ? "expired" : "live"}`;
   return (
     <div
+      className="ss-dual-status"
       style={{
         display: "grid",
         gap: 8,
         padding: 12,
-        background: tokens.bg,
+        background: tokens.surface,
         borderRadius: 16,
       }}
     >
-      <StatusLine who={props.youName ?? "You"} status={props.you} />
-      <StatusLine who={props.themName} status={props.them} />
-      <p style={{ margin: 0, color: tokens.textMuted, fontSize: 14 }}>
-        {summaryCopy(props)}
-      </p>
+      <div key={key} style={{ display: "grid", gap: 8, animation: "ss-crossfade 240ms ease" }}>
+        <StatusLine who={props.youName ?? "You"} status={props.you} />
+        <StatusLine who={props.themName} status={props.them} />
+        <p style={{ margin: 0, color: tokens.textMuted, fontSize: 14 }}>
+          {dualStatusSummary({
+            themName: props.themName,
+            you: props.you,
+            them: props.them,
+            expired: props.expired,
+          })}
+        </p>
+      </div>
     </div>
   );
 }
 
 function StatusLine({ who, status }: { who: string; status: InviteUserStatus }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, alignItems: "center" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        fontSize: 14,
+        color: tokens.text,
+      }}
+    >
       <span>{who}</span>
-      <strong
-        className="ss-status-pill"
-        style={{
-          textTransform: "capitalize",
-          minHeight: 24,
-          padding: "2px 10px",
-          borderRadius: 999,
-          background: status === "accepted" ? tokens.accentSoft : status === "declined" ? `${tokens.danger}22` : tokens.surface,
-          color: status === "declined" ? tokens.danger : tokens.text,
-        }}
-      >
+      <span style={{ color: tokens.textMuted }}>·</span>
+      <span className="ss-status-pill" style={pillStyle(status)}>
         {status}
-      </strong>
+      </span>
     </div>
   );
 }
 
-function summaryCopy(props: {
-  themName: string;
-  you: InviteUserStatus;
-  them: InviteUserStatus;
-}): string {
-  if (props.you === "declined" || props.them === "declined") {
-    return "This one’s closed. Your bot keeps exploring";
+function pillStyle(status: InviteUserStatus): CSSProperties {
+  if (status === "accepted") {
+    return {
+      textTransform: "capitalize",
+      minHeight: 24,
+      padding: "2px 10px",
+      borderRadius: 999,
+      background: "color-mix(in srgb, #5C8A6E 28%, #FFF8F2)",
+      color: tokens.text,
+      border: "1px solid transparent",
+    };
   }
-  if (props.you === "accepted" && props.them === "accepted") {
-    return "You’re both in — details locked";
+  if (status === "declined") {
+    return {
+      textTransform: "capitalize",
+      minHeight: 24,
+      padding: "2px 10px",
+      borderRadius: 999,
+      background: "transparent",
+      color: "#B85C4E",
+      border: "1px solid #B85C4E",
+    };
   }
-  if (props.you === "accepted" && props.them === "waiting") {
-    return `Waiting on ${props.themName}…`;
-  }
-  if (props.you === "waiting" && props.them === "accepted") {
-    return `${props.themName} is in — your move`;
-  }
-  return "Waiting on both of you…";
+  return {
+    textTransform: "capitalize",
+    minHeight: 24,
+    padding: "2px 10px",
+    borderRadius: 999,
+    background: tokens.surface,
+    color: tokens.textMuted,
+    border: `1px solid ${tokens.border}`,
+  };
 }

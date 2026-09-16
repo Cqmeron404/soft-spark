@@ -55,6 +55,8 @@ export type BotTurnInput = {
 export type BotTurnResult = {
   text: string;
   safety: SafetyResult;
+  /** True when LLM path used stub/persona fallback. Internal only. */
+  fallback?: boolean;
 };
 
 export type VenueCandidate = {

@@ -8,9 +8,10 @@
     "dev:web": "pnpm --filter @soft-spark/web dev",
     "dev:realtime": "pnpm --filter @soft-spark/realtime dev",
     "build": "turbo build --filter=@soft-spark/shared --filter=@soft-spark/db --filter=@soft-spark/match-engine --filter=@soft-spark/ui --filter=@soft-spark/api --filter=@soft-spark/web",
-    "typecheck": "turbo typecheck --filter=@soft-spark/shared --filter=@soft-spark/db --filter=@soft-spark/match-engine --filter=@soft-spark/ui --filter=@soft-spark/api --filter=@soft-spark/web",
+    "typecheck": "turbo typecheck --filter=@soft-spark/shared --filter=@soft-spark/db --filter=@soft-spark/match-engine --filter=@soft-spark/ui --filter=@soft-spark/api --filter=@soft-spark/web --filter=@soft-spark/mobile",
     "demo": "pnpm --filter @soft-spark/api demo",
-    "seed": "pnpm --filter @soft-spark/db seed"
+    "seed": "pnpm --filter @soft-spark/db seed",
+    "test": "pnpm --filter @soft-spark/match-engine test && pnpm demo"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

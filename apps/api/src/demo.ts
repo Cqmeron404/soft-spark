@@ -1,10 +1,12 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EVENTS, formatMilesFromKm } from "@soft-spark/shared";
+import { EVENTS, dualStatusSummary, formatMilesFromKm } from "@soft-spark/shared";
 import { PGlite } from "@soft-spark/db";
+import { runInviteThresholdRegression } from "@soft-spark/match-engine";
 import { createApp } from "./app.js";
 import { bootstrap } from "./bootstrap.js";
+import { bootMissing, placesMissing } from "./env.js";
 import { createEngine, orchestrateMatch } from "./orchestrate.js";
 
 const MAYA = {
@@ -27,6 +29,7 @@ const MAYA = {
   homeGeo: { lat: 39.739, lng: -104.979 },
   homeTz: "America/Denver",
   vibeTags: ["Curious", "Soft"],
+  photoUrl: "https://cdn.softspark.dev/maya.jpg",
 };
 
 const JORDAN = {
@@ -89,6 +92,17 @@ async function signUp(
 async function main() {
   process.env.MATCH_ENGINE_MODE ??= "stub";
   const failures: string[] = [];
+  const soak = await runInviteThresholdRegression();
+  for (const f of soak) failures.push(f);
+  if (!soak.length) console.log("ok  invite_threshold 0.75 soak / persona regression");
+
+  if (bootMissing({ NODE_ENV: "production" } as NodeJS.ProcessEnv).join() !== "DATABASE_URL,BETTER_AUTH_SECRET") {
+    failures.push("prod boot should require DATABASE_URL + BETTER_AUTH_SECRET");
+  } else console.log("ok  prod boot validates DATABASE_URL + BETTER_AUTH_SECRET");
+  if (placesMissing({ NODE_ENV: "production" } as NodeJS.ProcessEnv)[0] !== "GOOGLE_PLACES_API_KEY") {
+    failures.push("prod places should require GOOGLE_PLACES_API_KEY");
+  } else console.log("ok  prod VenueSuggester requires GOOGLE_PLACES_API_KEY");
+
   const ctx = await bootstrap({ pglite: new PGlite() });
   const app = createApp(ctx);
 
@@ -150,7 +164,11 @@ async function main() {
   const maya = await json<OnboardRes>(mayaRes);
   const jordan = await json<OnboardRes>(jordanRes);
   if (!maya.user?.id || !maya.bot?.id) failures.push("maya missing user/bot");
-  console.log("ok  onboard Maya + Jordan (User + DatingBot)");
+  const mayaProfile = await json<{ photoUrl?: string }>(
+    await app.request("/users/me", { headers: { cookie: mayaAuth.cookie } })
+  );
+  if (mayaProfile.photoUrl !== MAYA.photoUrl) failures.push("onboard did not persist photoUrl");
+  else console.log("ok  onboard Maya + Jordan (User + DatingBot + photoUrl)");
 
   ctx.events.clear();
   const engine = await createEngine(ctx.store);
@@ -191,6 +209,11 @@ async function main() {
   } else {
     console.log("ok  GET /matches → state + band only");
   }
+  const jordanListRaw = JSON.stringify(
+    await json(await app.request("/matches", { headers: { cookie: jordanAuth.cookie } }))
+  );
+  if (!jordanListRaw.includes("maya.jpg")) failures.push("match peer missing photoUrl");
+  else console.log("ok  match/invite peer uses photoUrl");
 
   const detail = await json<MatchRes>(
     await app.request(`/matches/${match.id}`, { headers: { cookie: mayaAuth.cookie } })
@@ -335,6 +358,66 @@ async function main() {
     console.log("ok  0 venues → exploring + match.venue_unavailable");
   }
 
+  const copyBoth = dualStatusSummary({ themName: "Jordan", you: "waiting", them: "waiting" });
+  const copyExpired = dualStatusSummary({ themName: "Jordan", you: "waiting", them: "waiting", expired: true });
+  if (copyBoth !== "Waiting on both of you…") failures.push(`DualStatusRow copy drifted: ${copyBoth}`);
+  if (copyExpired !== "This invite expired. Your bot keeps exploring") failures.push("expired DualStatusRow copy drifted");
+  else console.log("ok  DualStatusRow Aura copy");
+
+  const photoPatch = await app.request("/users/me", {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: mayaAuth.cookie },
+    body: JSON.stringify({ photoUrl: "https://cdn.softspark.dev/maya.jpg" }),
+  });
+  const photoUser = await json<{ photoUrl?: string }>(photoPatch);
+  if (photoUser.photoUrl !== "https://cdn.softspark.dev/maya.jpg") failures.push("photoUrl not persisted on profile patch");
+  else console.log("ok  onboard/profile photoUrl persisted");
+
+  const pushReg = await app.request("/users/me/push", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: jordanAuth.cookie },
+    body: JSON.stringify({ platform: "expo", expoToken: "ExponentPushToken[demo]" }),
+  });
+  if (pushReg.status !== 201) failures.push(`push register expected 201, got ${pushReg.status}`);
+  else console.log("ok  Expo push token registered (status-only sender)");
+
+  const health = await json<{ env?: { database?: boolean; places?: boolean } }>(await app.request("/health"));
+  if (!health.env) failures.push("health missing env flags");
+  else console.log("ok  /health reports env flags without secrets");
+
+  const prevMode = process.env.MATCH_ENGINE_MODE;
+  const prevKey = process.env.OPENAI_API_KEY;
+  process.env.MATCH_ENGINE_MODE = "llm";
+  delete process.env.OPENAI_API_KEY;
+  const llmAuthA = await signUp(app, { email: "llm-a@softspark.dev", password: "spark-demo-llm", name: "LlmA" });
+  const llmAuthB = await signUp(app, { email: "llm-b@softspark.dev", password: "spark-demo-llm", name: "LlmB" });
+  const llmA = await json<OnboardRes>(
+    await app.request("/users/me/onboard", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: llmAuthA.cookie },
+      body: JSON.stringify({ ...MAYA, profile: { ...MAYA.profile, displayName: "LlmA" } }),
+    })
+  );
+  const llmB = await json<OnboardRes>(
+    await app.request("/users/me/onboard", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: llmAuthB.cookie },
+      body: JSON.stringify({ ...JORDAN, profile: { ...JORDAN.profile, displayName: "LlmB" } }),
+    })
+  );
+  const llmMatch = await orchestrateMatch({
+    store: ctx.store,
+    events: ctx.events,
+    engine: await createEngine(ctx.store),
+    userAId: llmA.user.id,
+    userBId: llmB.user.id,
+  });
+  if (llmMatch.state !== "invited") {
+    failures.push(`llm soak without key should stub-fallback to invited, got ${llmMatch.state}`);
+  } else console.log("ok  MATCH_ENGINE_MODE=llm without OPENAI_API_KEY → stub fallback → invited");
+  process.env.MATCH_ENGINE_MODE = prevMode;
+  if (prevKey) process.env.OPENAI_API_KEY = prevKey;
+
   await ctx.close();
 
   const dataDir = await mkdtemp(join(tmpdir(), "soft-spark-"));
@@ -378,7 +461,7 @@ async function main() {
     for (const f of failures) console.error(" -", f);
     process.exit(1);
   }
-  console.log("\nSlice 2 path: Auth → Postgres → Realtime → Venues → Nexus stub personas → booked");
+  console.log("\nSlice 3 path: Deploy wiring → Places prod → Push (band/invite) → DualStatusRow/photo → LLM soak → booked");
 }
 
 main().catch((err) => {

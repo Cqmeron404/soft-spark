@@ -49,20 +49,8 @@ export function createLlmConversationRunner(complete: LlmComplete): {
   return {
     async runBotTurn(input: BotTurnInput): Promise<BotTurnResult> {
       const prompt = buildBotTurnPrompt(input);
-      let text: string;
-      try {
-        text = (await complete(prompt)).trim().slice(0, 600);
-        if (!text) throw new Error("empty");
-      } catch {
-        // Fallback: phase-safe one-liner (Forge may also emit bot.turn.fallback)
-        const phase = phaseForTurn(input.history.length + 1);
-        text =
-          phase === "open"
-            ? "Hey — curious what a good weekend looks like for your human."
-            : phase === "close"
-              ? "I think this is worth an in-person hello if a midpoint works."
-              : "I'm noticing overlapping interests — want to unpack that a bit?";
-      }
+      const text = (await complete(prompt)).trim().slice(0, 600);
+      if (!text) throw new Error("llm_empty");
       const safety = safetyCheckMessage(text);
       return { text, safety };
     },

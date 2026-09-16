@@ -64,7 +64,11 @@
 }
 
 .ss-status-pill {
-  transition: background 220ms ease, color 220ms ease, transform 220ms ease;
+  transition: background 240ms ease, color 240ms ease, border-color 240ms ease;
+}
+
+.ss-dual-status {
+  animation: ss-crossfade 240ms ease;
 }
 
 .ss-error {

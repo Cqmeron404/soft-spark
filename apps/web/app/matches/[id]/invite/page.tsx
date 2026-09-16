@@ -28,10 +28,8 @@ export default function InvitePage() {
   }, [params.id]);
 
   const live = useMatchRealtime((event) => {
-    if (event.matchId !== params.id || !event.invite || !match) return;
-    const isA = true;
+    if (event.matchId !== params.id) return;
     void getMatch(params.id).then(setMatch);
-    void isA;
   });
 
   if (!match) return <p>Catching up…</p>;
@@ -54,6 +52,7 @@ export default function InvitePage() {
         peerName={match.peer?.displayName ?? "Them"}
         you={match.invite.you}
         them={match.invite.them}
+        expired={Boolean(match.invite.window.end && Date.parse(match.invite.window.end) < Date.now())}
         onAccept={async () => {
           try {
             setMatch(await acceptInvite(match.id, match.invite!.id));

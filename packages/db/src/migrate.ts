@@ -145,6 +145,16 @@ const STATEMENTS = [
     why TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
+  `CREATE TABLE IF NOT EXISTS "push_devices" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
+    platform TEXT NOT NULL,
+    endpoint TEXT,
+    p256dh TEXT,
+    auth TEXT,
+    expo_token TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
 ];
 
 export async function applySchema(db: SparkDb): Promise<void> {

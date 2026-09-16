@@ -15,8 +15,10 @@ import {
   toUserDto,
 } from "./map-client.js";
 import { createEngine, orchestrateMatch, respondInvite } from "./orchestrate.js";
+import type { PushDispatcher } from "./push.js";
 import type { RealtimeHub } from "./realtime.js";
 import type { SparkStore } from "./store.js";
+import { envFlags } from "./env.js";
 
 export type AppEnv = {
   Variables: { userId: string; authId: string };
@@ -28,10 +30,11 @@ export type AppDeps = {
   hub: RealtimeHub;
   events: EventLog;
   db: SparkDb;
+  push?: PushDispatcher;
 };
 
 export function createApp(deps: AppDeps) {
-  const { store, auth, hub, events, db } = deps;
+  const { store, auth, hub, events, db, push } = deps;
   const app = new Hono<AppEnv>();
   const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
   app.use(
@@ -40,16 +43,31 @@ export function createApp(deps: AppDeps) {
       origin: (origin) => origin || webOrigin,
       credentials: true,
       allowHeaders: ["Content-Type", "Authorization", "x-user-id"],
-      allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
+      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     })
   );
 
-  app.get("/health", (c) =>
-    c.json({
+  app.get("/health", (c) => {
+    const flags = envFlags();
+    return c.json({
       ok: true,
       service: "soft-spark-api",
       authMode: authMode(),
       matchEngine: process.env.MATCH_ENGINE_MODE ?? "stub",
+      env: {
+        database: flags.database,
+        authSecret: flags.authSecret,
+        places: flags.places,
+        llm: flags.llm,
+        webPush: flags.webPush,
+      },
+    });
+  });
+
+  app.get("/push/vapid-public", (c) =>
+    c.json({
+      configured: Boolean(process.env.VAPID_PUBLIC_KEY),
+      publicKey: process.env.VAPID_PUBLIC_KEY ?? null,
     })
   );
 
@@ -210,6 +228,41 @@ export function createApp(deps: AppDeps) {
     });
   });
 
+  app.post("/users/me/push", async (c) => {
+    const userId = c.get("userId");
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    const body = (await c.req.json()) as {
+      platform?: "web" | "expo";
+      subscription?: { endpoint: string; keys?: { p256dh?: string; auth?: string } };
+      expoToken?: string;
+    };
+    const platform = body.platform ?? (body.expoToken ? "expo" : "web");
+    if (platform === "expo" && !body.expoToken) {
+      return c.json({ error: "expoToken required" }, 400);
+    }
+    if (platform === "web" && !body.subscription?.endpoint) {
+      return c.json({ error: "subscription.endpoint required" }, 400);
+    }
+    const device = await store.upsertPushDevice({
+      userId,
+      platform,
+      endpoint: body.subscription?.endpoint,
+      p256dh: body.subscription?.keys?.p256dh,
+      auth: body.subscription?.keys?.auth,
+      expoToken: body.expoToken,
+    });
+    return c.json({ id: device.id, platform: device.platform, configured: push?.configured() ?? { web: false, expo: true } }, 201);
+  });
+
+  app.get("/users/me/push", async (c) => {
+    const userId = c.get("userId");
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    const devices = await store.listPushDevices(userId);
+    return c.json(
+      devices.map((d) => ({ id: d.id, platform: d.platform }))
+    );
+  });
+
   app.get("/matches", async (c) => {
     const userId = c.get("userId");
     if (!userId) return c.json({ error: "profile_incomplete" }, 404);
@@ -239,6 +292,7 @@ export function createApp(deps: AppDeps) {
         store,
         events,
         hub,
+        push,
         matchId: c.req.param("id"),
         inviteId: c.req.param("inviteId"),
         userId: c.get("userId"),
@@ -258,6 +312,7 @@ export function createApp(deps: AppDeps) {
         store,
         events,
         hub,
+        push,
         matchId: c.req.param("id"),
         inviteId: c.req.param("inviteId"),
         userId: c.get("userId"),
@@ -302,6 +357,7 @@ export function createApp(deps: AppDeps) {
         store,
         events,
         hub,
+        push,
         engine,
         userAId: users[0],
         userBId: users[1],
