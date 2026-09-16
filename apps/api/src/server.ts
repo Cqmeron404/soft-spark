@@ -36,3 +36,12 @@ export function getApp(): Promise<StartedApp> {
   });
   return singleton;
 }
+
+/** Test helper: close PGlite/Postgres so the gateway test process can exit. */
+export async function resetGetApp(): Promise<void> {
+  const current = singleton;
+  singleton = undefined;
+  if (!current) return;
+  const app = await current.catch(() => undefined);
+  await app?.close();
+}

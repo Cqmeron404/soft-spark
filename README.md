@@ -54,7 +54,7 @@ Live deploy needs **host secrets**. This repo does **not** invent credentials. W
 | Surface | Config | Notes |
 |---------|--------|--------|
 | Web | `apps/web/vercel.json` + root `vercel.json` | Vercel project Root Directory = `apps/web` (or deploy from repo root). Set `NEXT_PUBLIC_API_URL`. |
-| API | `apps/api/vercel.json` + `apps/api/Dockerfile` | Vercel Root Directory = `apps/api`, Framework **Other** (`framework: null`). Serverless entry is committed `apps/api/api/index.ts` — `functions` must glob that source file (a generated `api/index.js` will fail the build). The Hobby runtime is **Node (req, res)**; the gateway converts IncomingMessage headers into a Web `Request` (`headers.get`) and answers `GET /health` without waiting on Postgres. `installCommand` / `buildCommand` still run from the **repo root** so workspace packages emit `dist/` JS. `maxDuration` 60s (SSE degraded). Docker is preferred for long-lived Node. |
+| API | `apps/api/vercel.json` + `apps/api/Dockerfile` | Vercel Root Directory = `apps/api`, Framework **Other** (`framework: null`). Serverless entry is committed `apps/api/api/index.ts` — `functions` must glob that source file (a generated `api/index.js` will fail the build). The Hobby runtime is **Node (req, res)**; the gateway converts IncomingMessage into a Web `Request` (`headers.get`), **buffers POST bodies** (streaming `Readable.toWeb` hangs `request.json()` until timeout), and answers `GET /health` plus `OPTIONS /auth/*` without waiting on Postgres. `installCommand` / `buildCommand` still run from the **repo root** so workspace packages emit `dist/` JS. `maxDuration` 60s (SSE degraded). Docker is preferred for long-lived Node. |
 | Checklist | `bash scripts/deploy.sh check` | Prints which required vars are missing (values never printed). |
 | VAPID | `bash scripts/deploy.sh vapid` | `npx web-push generate-vapid-keys` — do not commit keys. |
 
@@ -99,7 +99,14 @@ LLM soak (optional; stub fallback if missing). **Rollback = `MATCH_ENGINE_MODE=s
 
 Copy `.env.example` locally. Set the same names in Vercel / Fly / Render dashboards.
 
-**Blockers for a live URL from this PR:** this change is aimed at `/health` JSON on `https://soft-spark-api.vercel.app` after merge + redeploy (Hobby env is already wired: `ALLOW_VENUE_SEED=1`, `MATCH_ENGINE_MODE` stub default). Workspace packages ship `dist/` JS; the Hobby function entry is `apps/api/api/index.ts`. After merge: redeploy the API project.
+**Blockers for a live URL from this PR:** redeploy the **API** project after merge so `POST /auth/sign-up/email` returns HTTP (200/4xx) instead of hanging. `/health` stays JSON without booting on GET. Workspace packages ship `dist/` JS; the Hobby function entry is `apps/api/api/index.ts`.
+
+**Postgres schema (Neon):** the API already runs `CREATE TABLE IF NOT EXISTS` for Better Auth + app tables on boot (`applySchema`). Live Hobby already has `DATABASE_URL` (see `/health` → `env.database: true`) — **do not invent or commit it**. If you provision a **new** empty database, either let the first function boot apply DDL, or from a machine that has the host `DATABASE_URL` (use the **direct** Neon URL, not the `-pooler` URL):
+
+```bash
+# optional; boot DDL is enough for Hobby
+pnpm --filter @soft-spark/db exec drizzle-kit push
+```
 
 ## Env vars
 
