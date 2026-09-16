@@ -71,16 +71,3 @@ export async function seedVenueCatalog(db: SparkDb): Promise<number> {
   );
   return DENVER_CATALOG.length;
 }
-
-export const DEMO_ACCOUNTS = {
-  maya: {
-    email: "maya@softspark.dev",
-    password: "spark-demo-maya",
-    name: "Maya",
-  },
-  jordan: {
-    email: "jordan@softspark.dev",
-    password: "spark-demo-jordan",
-    name: "Jordan",
-  },
-} as const;

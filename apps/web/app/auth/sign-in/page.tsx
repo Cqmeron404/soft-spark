@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppLogo, SoftError } from "@soft-spark/ui";
+import { DEMO_ACCOUNTS } from "@soft-spark/shared";
 import { getMe } from "@/lib/api";
 import { signInEmail } from "@/lib/auth";
 import { writeSession } from "@/lib/session";
@@ -15,11 +16,11 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submit() {
+  async function authenticate(nextEmail: string, nextPassword: string) {
     setError(null);
     setBusy(true);
     try {
-      await signInEmail({ email, password });
+      await signInEmail({ email: nextEmail, password: nextPassword });
       try {
         const me = await getMe();
         writeSession({ id: me.id, displayName: me.displayName });
@@ -32,6 +33,16 @@ export default function SignInPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function submit() {
+    void authenticate(email, password);
+  }
+
+  function demoSignIn(account: (typeof DEMO_ACCOUNTS)["maya"]) {
+    setEmail(account.email);
+    setPassword(account.password);
+    void authenticate(account.email, account.password);
   }
 
   return (
@@ -62,22 +73,18 @@ export default function SignInPage() {
         <button
           type="button"
           className="ss-btn ss-btn-ghost"
-          onClick={() => {
-            setEmail("maya@softspark.dev");
-            setPassword("spark-demo-maya");
-          }}
+          disabled={busy}
+          onClick={() => demoSignIn(DEMO_ACCOUNTS.maya)}
         >
-          Maya demo
+          Demo Maya
         </button>
         <button
           type="button"
           className="ss-btn ss-btn-ghost"
-          onClick={() => {
-            setEmail("jordan@softspark.dev");
-            setPassword("spark-demo-jordan");
-          }}
+          disabled={busy}
+          onClick={() => demoSignIn(DEMO_ACCOUNTS.jordan)}
         >
-          Jordan demo
+          Demo Jordan
         </button>
       </div>
     </div>

@@ -1,60 +1,26 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EVENTS, dualStatusSummary, formatMilesFromKm } from "@soft-spark/shared";
+import {
+  DEMO_ACCOUNTS,
+  DEMO_JORDAN_ONBOARD,
+  DEMO_MAYA_ONBOARD,
+  EVENTS,
+  dualStatusSummary,
+  formatMilesFromKm,
+} from "@soft-spark/shared";
 import { PGlite } from "@soft-spark/db";
 import { runInviteThresholdRegression } from "@soft-spark/match-engine";
 import { createApp } from "./app.js";
 import { bootstrap } from "./bootstrap.js";
 import { webOrigins } from "./cors.js";
-import { bootMissing, placesMissing } from "./env.js";
+import { ensureDemoUsers } from "./demo-users.js";
+import { allowDemoUsers, bootMissing, placesMissing } from "./env.js";
 import { runNexusSoakScenarios } from "./nexus-soak.js";
 import { createEngine, orchestrateMatch } from "./orchestrate.js";
 
-const MAYA = {
-  botDatingOptIn: true,
-  profile: {
-    displayName: "Maya",
-    age: 29,
-    gender: "woman",
-    interestedIn: ["man"],
-    bio: "Denver nights, italian food",
-  },
-  prefs: {
-    cuisine: ["italian", "american"],
-    budget: 3 as const,
-    maxTravelKm: 25,
-    dealbreakers: [],
-    lookingFor: "relationship",
-    interests: ["food", "hiking", "live music"],
-  },
-  homeGeo: { lat: 39.739, lng: -104.979 },
-  homeTz: "America/Denver",
-  vibeTags: ["Curious", "Soft"],
-  photoUrl: "https://cdn.softspark.dev/maya.jpg",
-};
-
-const JORDAN = {
-  botDatingOptIn: true,
-  profile: {
-    displayName: "Jordan",
-    age: 31,
-    gender: "man",
-    interestedIn: ["woman"],
-    bio: "LoHi, long walks, pasta",
-  },
-  prefs: {
-    cuisine: ["italian", "american"],
-    budget: 3 as const,
-    maxTravelKm: 20,
-    dealbreakers: [],
-    lookingFor: "relationship",
-    interests: ["food", "hiking", "design"],
-  },
-  homeGeo: { lat: 39.759, lng: -104.999 },
-  homeTz: "America/Denver",
-  vibeTags: ["Curious", "Witty"],
-};
+const MAYA = DEMO_MAYA_ONBOARD;
+const JORDAN = DEMO_JORDAN_ONBOARD;
 
 type OnboardRes = { user: { id: string; displayName: string }; bot: { id: string } };
 type MatchRes = {
@@ -112,6 +78,11 @@ async function main() {
   if (bootMissing({ NODE_ENV: "production", ALLOW_VENUE_SEED: "1" } as NodeJS.ProcessEnv).includes("GOOGLE_PLACES_API_KEY")) {
     failures.push("prod boot must not fail solely for missing Places when seed mode is on");
   } else console.log("ok  prod boot does not require Places in seed mode");
+  if (!allowDemoUsers({} as NodeJS.ProcessEnv) || !allowDemoUsers({ ALLOW_DEMO_USERS: "1" } as NodeJS.ProcessEnv)) {
+    failures.push("demo users should default on");
+  } else if (allowDemoUsers({ ALLOW_DEMO_USERS: "0" } as NodeJS.ProcessEnv)) {
+    failures.push("ALLOW_DEMO_USERS=0 should disable demo user seed");
+  } else console.log("ok  ALLOW_DEMO_USERS defaults on, 0 disables");
 
   const ctx = await bootstrap({ pglite: new PGlite() });
   const app = createApp(ctx);
@@ -159,17 +130,17 @@ async function main() {
   else console.log("ok  onboard without session → 401");
 
   const mayaAuth = await signUp(app, {
-    email: "maya@softspark.dev",
-    password: "spark-demo-maya",
-    name: "Maya",
+    email: DEMO_ACCOUNTS.maya.email,
+    password: DEMO_ACCOUNTS.maya.password,
+    name: DEMO_ACCOUNTS.maya.name,
   });
   if (mayaAuth.res.status >= 400) {
     failures.push(`maya sign-up failed ${mayaAuth.res.status} ${await mayaAuth.res.text()}`);
   }
   const jordanAuth = await signUp(app, {
-    email: "jordan@softspark.dev",
-    password: "spark-demo-jordan",
-    name: "Jordan",
+    email: DEMO_ACCOUNTS.jordan.email,
+    password: DEMO_ACCOUNTS.jordan.password,
+    name: DEMO_ACCOUNTS.jordan.name,
   });
   if (jordanAuth.res.status >= 400) {
     failures.push(`jordan sign-up failed ${jordanAuth.res.status} ${await jordanAuth.res.text()}`);
@@ -424,9 +395,12 @@ async function main() {
   const health = await json<{
     venues?: string;
     matchEngine?: string;
-    env?: { database?: boolean; places?: boolean };
+    env?: { database?: boolean; places?: boolean; demoUsers?: boolean };
   }>(await app.request("/health"));
   if (!health.env) failures.push("health missing env flags");
+  if (health.env && health.env.demoUsers !== true) {
+    failures.push("health env.demoUsers should default true (boolean only)");
+  }
   if (health.venues !== "seed" && health.venues !== "places") {
     failures.push(`health venues mode should be seed|places, got ${health.venues}`);
   }
@@ -480,6 +454,88 @@ async function main() {
     await second.close();
   } finally {
     await rm(dataDir, { recursive: true, force: true });
+  }
+
+  const seedCtx = await bootstrap({ pglite: new PGlite() });
+  try {
+    const seedApp = createApp(seedCtx);
+    const wrongMaya = await seedApp.request("/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: DEMO_ACCOUNTS.maya.email,
+        password: "not-the-ui-password-1",
+        name: "Maya",
+      }),
+    });
+    if (wrongMaya.status >= 400) {
+      failures.push(`pre-seed Maya sign-up failed ${wrongMaya.status}`);
+    }
+    const seeded = await ensureDemoUsers({
+      app: seedApp,
+      auth: seedCtx.auth,
+      db: seedCtx.db,
+      store: seedCtx.store,
+      events: seedCtx.events,
+      hub: seedCtx.hub,
+      push: seedCtx.push,
+    });
+    const mayaSignIn = await seedApp.request("/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: DEMO_ACCOUNTS.maya.email,
+        password: DEMO_ACCOUNTS.maya.password,
+      }),
+    });
+    const jordanSignIn = await seedApp.request("/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: DEMO_ACCOUNTS.jordan.email,
+        password: DEMO_ACCOUNTS.jordan.password,
+      }),
+    });
+    if (mayaSignIn.status >= 400) {
+      failures.push(
+        `Maya UI credential sign-in failed ${mayaSignIn.status} ${await mayaSignIn.text()}`
+      );
+    } else console.log("ok  Maya demo email/password sign-in after seed");
+    if (jordanSignIn.status >= 400) {
+      failures.push(
+        `Jordan UI credential sign-in failed ${jordanSignIn.status} ${await jordanSignIn.text()}`
+      );
+    } else console.log("ok  Jordan demo email/password sign-in after seed");
+
+    const mayaCookie = cookiesFrom(mayaSignIn);
+    const mayaMe = await json<{ displayName?: string }>(
+      await seedApp.request("/users/me", { headers: { cookie: mayaCookie } })
+    );
+    if (mayaMe.displayName !== "Maya") {
+      failures.push(`seeded Maya /users/me expected onboarded Maya, got ${JSON.stringify(mayaMe)}`);
+    } else console.log("ok  seeded Maya is onboarded (not profile_incomplete)");
+
+    const mayaMatches = await json<{ id: string; state: string }[]>(
+      await seedApp.request("/matches", { headers: { cookie: mayaCookie } })
+    );
+    if (!Array.isArray(mayaMatches) || mayaMatches.length < 1) {
+      failures.push("seeded Maya should land on a match list with at least one match");
+    } else console.log(`ok  seeded Maya GET /matches → ${mayaMatches[0]?.state}`);
+
+    const again = await ensureDemoUsers({
+      app: seedApp,
+      auth: seedCtx.auth,
+      db: seedCtx.db,
+      store: seedCtx.store,
+      events: seedCtx.events,
+      hub: seedCtx.hub,
+      push: seedCtx.push,
+    });
+    if (again.mayaUserId !== seeded.mayaUserId || again.jordanUserId !== seeded.jordanUserId) {
+      failures.push("ensureDemoUsers should be idempotent (same profile ids)");
+    } else console.log("ok  ensureDemoUsers is idempotent");
+  } finally {
+    await seedCtx.close();
   }
 
   if (failures.length) {
