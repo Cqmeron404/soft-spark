@@ -327,7 +327,7 @@ export function createApp(deps: AppDeps) {
     });
   });
 
-  app.use("/internal/*", (c, next) => {
+  app.use("/internal/*", async (c, next) => {
     if (!internalRoutesLocked()) return next();
     if (c.req.path === "/internal/events" || c.req.path.startsWith("/internal/events/")) {
       return c.json({ error: "not_found" }, 404);
