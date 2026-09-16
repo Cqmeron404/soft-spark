@@ -1,8 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { Readable } from "node:stream";
 import { getRequestListener } from "@hono/node-server";
 import { Hono } from "hono";
-import type { Context } from "hono";
-import { cors } from "hono/cors";
+import type { Context, Next } from "hono";
+import { corsAllowOrigin, honoCors } from "./cors.js";
 import { bootMissing, healthPayload } from "./env.js";
 import { getApp } from "./server.js";
 
@@ -82,12 +83,37 @@ function absoluteUrl(input: IncomingLike): string {
   return `${proto}://${host}${raw.startsWith("/") ? raw : `/${raw}`}`;
 }
 
+function cloneRequest(url: URL | string, request: Request): Request {
+  const init: RequestInit & { duplex?: "half" } = {
+    method: request.method,
+    headers: request.headers,
+  };
+  if (request.body) {
+    init.body = request.body;
+    init.duplex = "half";
+  }
+  return new Request(url, init);
+}
+
+function incomingBody(input: Request | IncomingMessage | IncomingLike): RequestInit["body"] {
+  if (input instanceof Request) return input.body ?? undefined;
+  const stream = input as IncomingMessage;
+  if (typeof stream.pipe === "function" && typeof stream.on === "function" && !stream.readableEnded) {
+    return Readable.toWeb(stream) as unknown as ReadableStream;
+  }
+  const body = (input as IncomingLike).body;
+  if (typeof body === "string" || body instanceof Uint8Array || body instanceof ArrayBuffer) {
+    return body as RequestInit["body"];
+  }
+  return undefined;
+}
+
 /** Strip the Vercel `api/` mount so `/api/health` and `/api/auth/*` match app routes. */
 function unwrapApiMount(request: Request): Request {
   const url = new URL(request.url);
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
     url.pathname = url.pathname.slice("/api".length) || "/";
-    return new Request(url, request);
+    return cloneRequest(url, request);
   }
   return request;
 }
@@ -95,6 +121,7 @@ function unwrapApiMount(request: Request): Request {
 /**
  * Vercel Node (`framework: null`, `api/*.ts`) passes IncomingMessage whose
  * `headers` is a plain object. Hono's `c.req.header()` calls `this.raw.headers.get`.
+ * POST/PATCH bodies must be copied — dropping them makes Better Auth hang on `req.json()`.
  */
 export function ensureWebRequest(input: Request | IncomingMessage | IncomingLike): Request {
   if (input instanceof Request && hasHeadersGet(input.headers)) {
@@ -103,9 +130,12 @@ export function ensureWebRequest(input: Request | IncomingMessage | IncomingLike
   const method = String(input.method ?? "GET").toUpperCase();
   const headers = toWebHeaders(input.headers);
   const init: RequestInit & { duplex?: "half" } = { method, headers };
-  if (method !== "GET" && method !== "HEAD" && input instanceof Request && input.body) {
-    init.body = input.body;
-    init.duplex = "half";
+  if (method !== "GET" && method !== "HEAD") {
+    const body = incomingBody(input);
+    if (body) {
+      init.body = body;
+      init.duplex = "half";
+    }
   }
   return unwrapApiMount(new Request(absoluteUrl(input), init));
 }
@@ -122,22 +152,27 @@ function healthStatusBody() {
   };
 }
 
-const webOrigin = () => process.env.WEB_ORIGIN ?? "http://localhost:3000";
-const corsMw = cors({
-  origin: (origin) => origin || webOrigin(),
-  credentials: true,
-  allowHeaders: ["Content-Type", "Authorization", "x-user-id"],
-  allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-});
+const corsMw = honoCors();
+
+function applyHealthCors(c: Context) {
+  const allow = corsAllowOrigin(c.req.header("origin"));
+  if (allow) {
+    c.header("Access-Control-Allow-Origin", allow);
+    c.header("Access-Control-Allow-Credentials", "true");
+    c.header("Vary", "Origin");
+  }
+}
 
 const gateway = new Hono();
-gateway.use("/health", corsMw);
+/** Preflight must not boot Postgres. Gateway CORS previously covered `/health` only. */
+gateway.use("*", async (c, next: Next) => {
+  if (c.req.method === "OPTIONS") return corsMw(c, next);
+  await next();
+});
 
 function healthRoute(c: Context) {
   const { status, body } = healthStatusBody();
-  const origin = c.req.header("origin") || webOrigin();
-  c.header("Access-Control-Allow-Origin", origin);
-  c.header("Access-Control-Allow-Credentials", "true");
+  applyHealthCors(c);
   return c.json(body, status);
 }
 

@@ -9,6 +9,7 @@ import {
   verification,
   type SparkDb,
 } from "@soft-spark/db";
+import { isCrossSiteAuth, trustedAuthOrigins } from "./cors.js";
 import { DEV_AUTH_SECRET } from "./env.js";
 
 export function createAuth(db: SparkDb) {
@@ -17,12 +18,13 @@ export function createAuth(db: SparkDb) {
     process.env.AUTH_SECRET ??
     DEV_AUTH_SECRET;
   const baseURL = process.env.BETTER_AUTH_URL ?? process.env.API_URL ?? "http://localhost:8787";
-  const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
+  const production = process.env.NODE_ENV === "production";
+  const crossSite = isCrossSiteAuth();
   return betterAuth({
     basePath: "/auth",
     secret,
     baseURL,
-    trustedOrigins: [webOrigin, "softspark://", "exp://"],
+    trustedOrigins: trustedAuthOrigins(),
     emailAndPassword: { enabled: true },
     plugins: [expo()],
     database: drizzleAdapter(db, {
@@ -30,9 +32,14 @@ export function createAuth(db: SparkDb) {
       schema: { user, session, account, verification },
     }),
     advanced: {
+      useSecureCookies: production,
       defaultCookieAttributes: {
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        // vercel.app is on the public suffix list — do not set Domain=.vercel.app.
+        // Cross-site web (soft-spark.vercel.app) → API cookies need SameSite=None; Secure.
+        sameSite: production && crossSite ? "none" : "lax",
+        secure: production,
+        httpOnly: true,
+        path: "/",
       },
     },
   });
