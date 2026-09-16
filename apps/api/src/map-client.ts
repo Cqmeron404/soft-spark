@@ -1,10 +1,10 @@
 import type { BotDto, MatchDetail, MatchListItem, UserDto } from "@soft-spark/shared";
 import { isHomeCardReason } from "@soft-spark/shared";
-import type { MemoryStore } from "./store.js";
+import type { SparkStore } from "./store.js";
 
-export function toUserDto(store: MemoryStore, userId: string): UserDto {
-  const user = store.users.get(userId);
-  const prefs = store.prefsForUser(userId);
+export async function toUserDto(store: SparkStore, userId: string): Promise<UserDto> {
+  const user = await store.getUser(userId);
+  const prefs = await store.prefsForUser(userId);
   if (!user) throw new Error("user not found");
   return {
     id: user.id,
@@ -13,6 +13,7 @@ export function toUserDto(store: MemoryStore, userId: string): UserDto {
     gender: user.gender,
     interestedIn: user.interestedIn,
     bio: user.bio,
+    photoUrl: user.photoUrl,
     homeGeo: { lat: user.homeLat, lng: user.homeLng },
     homeTz: user.homeTz,
     prefs: {
@@ -26,8 +27,8 @@ export function toUserDto(store: MemoryStore, userId: string): UserDto {
   };
 }
 
-export function toBotDto(store: MemoryStore, userId: string): BotDto {
-  const bot = store.botForUser(userId);
+export async function toBotDto(store: SparkStore, userId: string): Promise<BotDto> {
+  const bot = await store.botForUser(userId);
   if (!bot) throw new Error("bot not found");
   return {
     id: bot.id,
@@ -37,15 +38,15 @@ export function toBotDto(store: MemoryStore, userId: string): BotDto {
   };
 }
 
-export function toMatchListItem(
-  store: MemoryStore,
+export async function toMatchListItem(
+  store: SparkStore,
   matchId: string,
   viewerId: string
-): MatchListItem {
-  const match = store.matches.get(matchId);
+): Promise<MatchListItem> {
+  const match = await store.getMatch(matchId);
   if (!match) throw new Error("match not found");
   const peerId = match.userAId === viewerId ? match.userBId : match.userAId;
-  const peer = store.users.get(peerId);
+  const peer = await store.getUser(peerId);
   return {
     id: match.id,
     state: match.state,
@@ -56,16 +57,16 @@ export function toMatchListItem(
   };
 }
 
-export function toMatchDetail(
-  store: MemoryStore,
+export async function toMatchDetail(
+  store: SparkStore,
   matchId: string,
   viewerId: string
-): MatchDetail {
-  const base = toMatchListItem(store, matchId, viewerId);
-  const match = store.matches.get(matchId)!;
-  const invite = store.inviteForMatch(matchId);
+): Promise<MatchDetail> {
+  const base = await toMatchListItem(store, matchId, viewerId);
+  const match = (await store.getMatch(matchId))!;
+  const invite = await store.inviteForMatch(matchId);
   if (!invite) return base;
-  const venue = store.venues.get(invite.venueId);
+  const venue = await store.getVenue(invite.venueId);
   if (!venue) return base;
   const isA = match.userAId === viewerId;
   return {
@@ -99,5 +100,8 @@ export function assertClientSafe(payload: unknown): void {
   const json = JSON.stringify(payload);
   if (json.includes('"confidence"') || json.includes("transcript")) {
     throw new Error("client payload leaked confidence or transcript");
+  }
+  if (/"messages"\s*:/.test(json)) {
+    throw new Error("client payload leaked messages[]");
   }
 }

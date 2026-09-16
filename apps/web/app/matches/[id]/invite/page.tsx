@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { MatchDetail } from "@soft-spark/shared";
-import { InviteCard } from "@soft-spark/ui";
+import { ConnectingCaption, InviteCard } from "@soft-spark/ui";
 import { acceptInvite, declineInvite, getMatch } from "@/lib/api";
+import { useMatchRealtime } from "@/lib/realtime";
 import { readSession } from "@/lib/session";
 
 export default function InvitePage() {
@@ -16,26 +17,32 @@ export default function InvitePage() {
   async function load() {
     const session = readSession();
     if (!session) {
-      router.replace("/onboard");
+      router.replace("/auth/sign-in");
       return;
     }
-    setMatch(await getMatch(session.id, params.id));
+    setMatch(await getMatch(params.id));
   }
 
   useEffect(() => {
     void load();
   }, [params.id]);
 
-  if (!match) return <p>Loading…</p>;
+  const live = useMatchRealtime((event) => {
+    if (event.matchId !== params.id || !event.invite || !match) return;
+    const isA = true;
+    void getMatch(params.id).then(setMatch);
+    void isA;
+  });
+
+  if (!match) return <p>Catching up…</p>;
   if (!match.invite) {
     return <p>No invite yet — still exploring.</p>;
   }
 
-  const session = readSession();
-
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {error ? <p style={{ color: "var(--ss-danger)" }}>{error}</p> : null}
+      <ConnectingCaption live={live} />
+      {error ? <p className="ss-error">{error}</p> : null}
       <InviteCard
         venueName={match.invite.venue.name}
         cuisine={match.invite.venue.cuisine}
@@ -48,17 +55,15 @@ export default function InvitePage() {
         you={match.invite.you}
         them={match.invite.them}
         onAccept={async () => {
-          if (!session) return;
           try {
-            setMatch(await acceptInvite(session.id, match.id, match.invite!.id));
+            setMatch(await acceptInvite(match.id, match.invite!.id));
           } catch (err) {
             setError(err instanceof Error ? err.message : "Accept failed");
           }
         }}
         onPass={async () => {
-          if (!session) return;
           try {
-            setMatch(await declineInvite(session.id, match.id, match.invite!.id));
+            setMatch(await declineInvite(match.id, match.invite!.id));
           } catch (err) {
             setError(err instanceof Error ? err.message : "Decline failed");
           }

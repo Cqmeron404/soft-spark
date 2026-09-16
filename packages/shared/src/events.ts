@@ -11,6 +11,7 @@ export const EVENTS = {
   INVITE_ACCEPTED: "invite.accepted",
   INVITE_DECLINED: "invite.declined",
   INVITE_BOOKED: "invite.booked",
+  BOT_TURN_FALLBACK: "bot.turn.fallback",
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];

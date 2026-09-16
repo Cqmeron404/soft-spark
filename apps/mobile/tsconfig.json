@@ -6,5 +6,5 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["App.tsx"]
+  "include": ["App.tsx", "src/**/*.ts"]
 }

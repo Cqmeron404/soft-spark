@@ -2,19 +2,77 @@ import {
   boolean,
   doublePrecision,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
 
+/** Better Auth core tables (drizzle adapter, provider: pg). */
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+});
+
+export const session = pgTable("session", {
+  id: text("id").primaryKey(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  token: text("token").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+});
+
+export const account = pgTable("account", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id").notNull(),
+  providerId: text("provider_id").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  idToken: text("id_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+  scope: text("scope"),
+  password: text("password"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+});
+
+export const verification = pgTable("verification", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
+});
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
+  authId: text("auth_id")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
   displayName: text("display_name").notNull(),
   age: integer("age").notNull(),
   gender: text("gender").notNull(),
   interestedIn: text("interested_in").array().notNull(),
   bio: text("bio"),
+  photoUrl: text("photo_url"),
   homeLat: doublePrecision("home_lat").notNull(),
   homeLng: doublePrecision("home_lng").notNull(),
   homeTz: text("home_tz").notNull().default("America/Denver"),
@@ -65,6 +123,15 @@ export const matches = pgTable("matches", {
   profileFit: doublePrecision("profile_fit").notNull().default(0),
   chemistry: doublePrecision("chemistry").notNull().default(0),
   logistics: doublePrecision("logistics").notNull().default(0),
+  chemistryDims: jsonb("chemistry_dims")
+    .$type<{
+      reciprocity: number;
+      curiosity: number;
+      valueAlignment: number;
+      emotionalSafety: number;
+      sharedSpark: number;
+    }>()
+    .notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -97,6 +164,17 @@ export const venues = pgTable("venues", {
   lat: doublePrecision("lat").notNull(),
   lng: doublePrecision("lng").notNull(),
   source: text("source").notNull().default("stub"),
+});
+
+export const venueCatalog = pgTable("venue_catalog", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  cuisine: text("cuisine").notNull(),
+  priceTier: integer("price_tier").notNull(),
+  approxNeighborhood: text("approx_neighborhood").notNull(),
+  lat: doublePrecision("lat").notNull(),
+  lng: doublePrecision("lng").notNull(),
+  source: text("source").notNull().default("catalog"),
 });
 
 export const invites = pgTable("invites", {

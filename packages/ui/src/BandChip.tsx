@@ -1,3 +1,5 @@
+"use client";
+
 import type { ConfidenceBand } from "@soft-spark/shared";
 import { BAND_LABEL, tokens } from "./tokens";
 
@@ -7,6 +9,8 @@ export function BandChip({ band }: { band: ConfidenceBand }) {
     band === "invite_ready" ? `0 0 8px ${tokens.accent}4D` : "none";
   return (
     <span
+      key={band}
+      className="ss-band-chip"
       style={{
         display: "inline-flex",
         alignItems: "center",

@@ -1,12 +1,26 @@
 {
   "expo": {
-    "name": "Soft spark",
+    "name": "Soft Spark",
     "slug": "soft-spark",
     "scheme": "softspark",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/brand/png/soft-spark-mark-512.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F7F1EA"
+    },
     "ios": { "supportsTablet": false },
-    "android": { "adaptiveIcon": { "backgroundColor": "#F7F1EA" } }
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F7F1EA"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
   }
 }

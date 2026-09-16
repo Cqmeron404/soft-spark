@@ -1,13 +1,13 @@
 import type { UserProfileSnapshot } from "@soft-spark/match-engine";
-import type { MemoryStore, PreferenceRecord, UserRecord } from "./store.js";
+import type { PreferenceRecord, SparkStore, UserRecord } from "./store.js";
 
-export function snapshotFor(
-  store: MemoryStore,
+export async function snapshotFor(
+  store: SparkStore,
   userId: string
-): UserProfileSnapshot {
-  const user = store.users.get(userId);
-  const prefs = store.prefsForUser(userId);
-  const bot = store.botForUser(userId);
+): Promise<UserProfileSnapshot> {
+  const user = await store.getUser(userId);
+  const prefs = await store.prefsForUser(userId);
+  const bot = await store.botForUser(userId);
   if (!user || !bot) throw new Error(`incomplete profile ${userId}`);
   return toSnapshot(user, prefs, bot.vibeTags);
 }
@@ -18,6 +18,7 @@ export function toSnapshot(
   vibeTags: string[]
 ): UserProfileSnapshot {
   return {
+    displayName: user.displayName,
     looking_for: prefs.lookingFor,
     age: user.age,
     gender: user.gender,

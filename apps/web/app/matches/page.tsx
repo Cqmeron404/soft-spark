@@ -2,27 +2,32 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { MatchListItem } from "@soft-spark/shared";
-import { MatchCard } from "@soft-spark/ui";
+import type { ClientRealtimeEvent, MatchListItem } from "@soft-spark/shared";
+import { ConnectingCaption, EmptyState, MatchCard, SoftToast } from "@soft-spark/ui";
 import { listMatches, orchestrate } from "@/lib/api";
-import { readKnownUsers, readSession } from "@/lib/session";
+import { useMatchRealtime } from "@/lib/realtime";
+import { readSession } from "@/lib/session";
 
 export default function MatchesPage() {
   const router = useRouter();
   const [items, setItems] = useState<MatchListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ matchId: string } | null>(null);
 
   async function load() {
     const session = readSession();
     if (!session) {
-      router.replace("/onboard");
+      router.replace("/auth/sign-in");
       return;
     }
     try {
-      setItems(await listMatches(session.id));
+      setItems(await listMatches());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      const status = (err as { status?: number }).status;
+      if (status === 401) router.replace("/auth/sign-in");
+      else if (status === 404) router.replace("/onboard");
+      else setError(err instanceof Error ? err.message : "Failed to load");
     }
   }
 
@@ -30,17 +35,24 @@ export default function MatchesPage() {
     void load();
   }, []);
 
+  const live = useMatchRealtime((event: ClientRealtimeEvent) => {
+    if (event.type === "invite.accepted" && event.invite?.userAStatus !== event.invite?.userBStatus) {
+      setToast({ matchId: event.matchId });
+    }
+    setItems((cur) => {
+      if (!cur) return cur;
+      return cur.map((m) =>
+        m.id === event.matchId
+          ? { ...m, state: event.state, band: event.band, reasons: event.reasons, updatedAt: new Date().toISOString() }
+          : m
+      );
+    });
+  });
+
   async function runJob() {
     setError(null);
-    const session = readSession();
-    const users = readKnownUsers();
-    const other = users.find((u) => u.id !== session?.id);
-    if (!session || !other) {
-      setError("Onboard two people first (Fill Maya, then Fill Jordan).");
-      return;
-    }
     try {
-      const result = await orchestrate(session.id, other.id);
+      const result = await orchestrate();
       setNote(`Match ${result.state} · ${result.band}`);
       await load();
     } catch (err) {
@@ -53,15 +65,22 @@ export default function MatchesPage() {
       <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>
         Your bots are out
       </h1>
-      <button type="button" className="ss-btn ss-btn-primary" onClick={runJob}>
+      <ConnectingCaption live={live} />
+      <button type="button" className="ss-btn ss-btn-primary" onClick={() => void runJob()}>
         Run match job (demo)
       </button>
       {note ? <p style={{ color: "var(--ss-text-muted)", margin: 0 }}>{note}</p> : null}
-      {error ? <p style={{ color: "var(--ss-danger)" }}>{error}</p> : null}
+      {toast ? (
+        <SoftToast
+          message="You’re both almost there — open invite"
+          action="Open"
+          onAction={() => router.push(`/matches/${toast.matchId}/invite`)}
+          onDismiss={() => setToast(null)}
+        />
+      ) : null}
+      {error ? <p className="ss-error">{error === "unauthorized" ? "Sign in to keep your bot dating" : error}</p> : null}
       {items && items.length === 0 ? (
-        <p style={{ color: "var(--ss-text-muted)" }}>
-          No active matches yet — your bot’s exploring
-        </p>
+        <EmptyState title="No active matches yet — your bot’s exploring" />
       ) : null}
       <div style={{ display: "grid", gap: 12 }}>
         {items?.map((m) => (

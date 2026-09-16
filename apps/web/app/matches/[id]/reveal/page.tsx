@@ -15,14 +15,14 @@ export default function RevealPage() {
   useEffect(() => {
     const session = readSession();
     if (!session) {
-      router.replace("/onboard");
+      router.replace("/auth/sign-in");
       return;
     }
     if (isRevealDismissed(params.id)) {
       router.replace(`/matches/${params.id}/invite`);
       return;
     }
-    void getMatch(session.id, params.id).then(setMatch);
+    void getMatch(params.id).then(setMatch);
   }, [params.id, router]);
 
   if (!match) return <p>Loading…</p>;

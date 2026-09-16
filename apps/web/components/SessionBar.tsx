@@ -3,28 +3,25 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  SESSION_EVENT,
-  readKnownUsers,
-  readSession,
-  writeSession,
-  type SessionUser,
-} from "@/lib/session";
+import { BrandMark } from "@soft-spark/ui";
+import { signOut } from "@/lib/auth";
+import { SESSION_EVENT, clearSession, readSession, type SessionUser } from "@/lib/session";
 
 export function SessionBar() {
   const pathname = usePathname();
   const [current, setCurrent] = useState<SessionUser | null>(null);
-  const [users, setUsers] = useState<SessionUser[]>([]);
 
   useEffect(() => {
     function refresh() {
       setCurrent(readSession());
-      setUsers(readKnownUsers());
     }
     refresh();
     window.addEventListener(SESSION_EVENT, refresh);
     return () => window.removeEventListener(SESSION_EVENT, refresh);
   }, [pathname]);
+
+  const authPage = pathname.startsWith("/auth/") || pathname === "/signin" || pathname === "/signup";
+  const homeHref = current ? "/matches" : "/";
 
   return (
     <header
@@ -37,32 +34,27 @@ export function SessionBar() {
         borderBottom: "1px solid var(--ss-border)",
       }}
     >
-      <Link href="/matches" style={{ fontFamily: "var(--ss-font-display)", fontWeight: 600, color: "inherit", textDecoration: "none" }}>
-        Soft spark
-      </Link>
+      <BrandMark href={homeHref} />
       <nav style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--ss-text-muted)" }}>
-        <Link href="/onboard">Onboard</Link>
-        {users.map((u) => (
-          <button
-            key={u.id}
-            type="button"
-            onClick={() => {
-              writeSession(u);
-              setCurrent(u);
-              window.location.reload();
-            }}
-            style={{
-              minHeight: 32,
-              borderRadius: 999,
-              border: current?.id === u.id ? "1px solid var(--ss-accent)" : "1px solid var(--ss-border)",
-              background: current?.id === u.id ? "var(--ss-accent-soft)" : "transparent",
-              padding: "0 10px",
-              cursor: "pointer",
-            }}
-          >
-            {u.displayName}
-          </button>
-        ))}
+        {!authPage && !current ? <Link href="/auth/sign-in">Sign in</Link> : null}
+        {current ? (
+          <>
+            <span>{current.displayName}</span>
+            <Link href="/onboard">Profile</Link>
+            <button
+              type="button"
+              className="ss-btn ss-btn-ghost"
+              style={{ minHeight: 32 }}
+              onClick={async () => {
+                await signOut();
+                clearSession();
+                window.location.href = "/auth/sign-in";
+              }}
+            >
+              Sign out
+            </button>
+          </>
+        ) : null}
       </nav>
     </header>
   );

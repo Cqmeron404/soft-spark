@@ -1,3 +1,4 @@
+/** Aura Ember tokens — cream / coral / peach / cocoa. */
 export const tokens = {
   bg: "#F7F1EA",
   surface: "#FFF8F2",

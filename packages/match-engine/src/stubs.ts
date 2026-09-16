@@ -6,6 +6,7 @@ import {
   suggestVenue,
 } from "./logic";
 import { DENVER_PLACES } from "./places";
+import { createCatalogPlaceProvider, createMidpointVenueSuggester } from "./venue-provider";
 import type {
   BotTurnInput,
   BotTurnResult,
@@ -22,7 +23,7 @@ import type {
   VenueSuggester,
 } from "./types";
 
-/** High-enough dims that typical overlapping Denver profiles clear 0.75. */
+/** High-enough dims that typical overlapping Denver profiles clear 0.75. Tests only. */
 export const HAPPY_PATH_DIMS: ChemistryDims = {
   reciprocity: 0.82,
   curiosity: 0.8,
@@ -31,26 +32,40 @@ export const HAPPY_PATH_DIMS: ChemistryDims = {
   sharedSpark: 0.8,
 };
 
-const PHASE_LINES: Record<ReturnType<typeof phaseForTurn>, string[]> = {
-  open: [
-    "Hey — curious what a good weekend looks like for your human.",
-    "Starting light: favorite neighborhood energy, not the resume.",
-  ],
-  explore: [
-    "Food and pace matter a lot here. What kind of table feels easy?",
-    "I'm noticing overlapping interests — want to unpack that a bit?",
-    "Values check: how do they like to spend an evening with someone new?",
-    "Travel and timing seem workable. Still curious about the vibe match.",
-  ],
-  spark: [
-    "There's a real spark around humor and shared pace.",
-    "This is starting to feel like people who would actually enjoy a table together.",
-  ],
-  close: [
-    "I think this is worth an in-person hello if a midpoint works.",
-    "Wrapping up — chemistry feels strong enough to leave it to the humans.",
-  ],
-};
+function personaLine(input: BotTurnInput, phase: ReturnType<typeof phaseForTurn>, turn: number): string {
+  const name = input.profile.displayName ?? "my human";
+  const interest = input.profile.interests[0] ?? "good food";
+  const extra = input.profile.interests[1];
+  const vibe = input.profile.vibeTags[0]?.toLowerCase() ?? "curious";
+  const looking = input.profile.looking_for;
+  switch (phase) {
+    case "open":
+      return turn === 1
+        ? `Hey — I speak for ${name}, who's ${vibe} and into ${interest}. What's a good weekend look like on your side?`
+        : `Keeping it light: ${name} lights up around ${interest}, not a resume dump. How do they like to spend an evening?`;
+    case "explore":
+      if (turn === 3) {
+        return `They're looking for ${looking}. ${interest} keeps coming up — is that a shared thread for your human too?`;
+      }
+      if (turn === 4) {
+        return extra
+          ? `Also noticing ${extra} overlap. What kind of table feels easy — lively or quieter?`
+          : `Values check: how do they like to spend an evening with someone new?`;
+      }
+      if (turn === 5) {
+        return `Food and pace matter a lot here. ${name} is ${vibe} about trying new spots, never the logistics.`;
+      }
+      return `Travel and timing seem workable. Still curious whether ${interest} is a real spark or just small talk.`;
+    case "spark":
+      return turn === 7
+        ? `There's a real spark around ${interest} and a shared ${looking === "casual" ? "easy" : "steady"} pace.`
+        : `This is starting to feel like people who would actually enjoy a table together.`;
+    default:
+      return turn === 9
+        ? `I think this is worth an in-person hello if a midpoint works — I'll leave venues to the system.`
+        : `Wrapping up — chemistry around ${interest} feels strong enough to leave it to the humans.`;
+  }
+}
 
 export type ScoreContextGetter = (matchId: string) => Promise<ScoreContext>;
 
@@ -69,13 +84,13 @@ export function createStubMatchScorer(getContext: ScoreContextGetter): MatchScor
   };
 }
 
+/** Persona-grounded template runner (Slice 2 stub). Keep for tests and MATCH_ENGINE_MODE=stub. */
 export function createStubConversationRunner(): ConversationRunner {
   return {
     async runBotTurn(input: BotTurnInput): Promise<BotTurnResult> {
       const turn = input.history.length + 1;
       const phase = phaseForTurn(turn);
-      const lines = PHASE_LINES[phase];
-      const text = lines[(turn - 1) % lines.length] ?? lines[0];
+      const text = personaLine(input, phase, turn);
       const safety = safetyCheckMessage(text);
       return { text, safety };
     },
@@ -98,9 +113,14 @@ export function createStubVenueSuggester(options?: {
   empty?: boolean;
 }): VenueSuggester {
   const places = options?.places ?? DENVER_PLACES;
+  if (options?.empty) {
+    return createMidpointVenueSuggester({
+      provider: createCatalogPlaceProvider([]),
+      empty: true,
+    });
+  }
   return {
     async suggestVenue(input: SuggestVenueInput): Promise<SuggestVenueResult> {
-      if (options?.empty) return { candidates: [] };
       const asSnapshot = (u: SuggestVenueInput["userA"]): UserProfileSnapshot => ({
         looking_for: "unsure",
         age: 30,
@@ -124,7 +144,7 @@ export function createStubVenueSuggester(options?: {
   };
 }
 
-export function dimsForTurn(turn: number, happyPath = true): ChemistryDims {
+export function dimsForTurn(turn: number, happyPath = false): ChemistryDims {
   if (happyPath) return { ...HAPPY_PATH_DIMS };
   const t = Math.min(turn, CONSTANTS.MAX_TURNS) / CONSTANTS.MAX_TURNS;
   const v = 0.4 + 0.45 * t;

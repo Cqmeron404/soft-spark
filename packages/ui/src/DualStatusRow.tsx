@@ -30,9 +30,21 @@ export function DualStatusRow(props: {
 
 function StatusLine({ who, status }: { who: string; status: InviteUserStatus }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, alignItems: "center" }}>
       <span>{who}</span>
-      <strong style={{ textTransform: "capitalize" }}>{status}</strong>
+      <strong
+        className="ss-status-pill"
+        style={{
+          textTransform: "capitalize",
+          minHeight: 24,
+          padding: "2px 10px",
+          borderRadius: 999,
+          background: status === "accepted" ? tokens.accentSoft : status === "declined" ? `${tokens.danger}22` : tokens.surface,
+          color: status === "declined" ? tokens.danger : tokens.text,
+        }}
+      >
+        {status}
+      </strong>
     </div>
   );
 }
