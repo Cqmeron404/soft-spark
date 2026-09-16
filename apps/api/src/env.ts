@@ -1,5 +1,6 @@
 /** Production boot + feature flags. Never invent credentials. */
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import {
   assertPlacesKeyInProd,
   isForcedSeedVenueMode,
@@ -9,8 +10,37 @@ import {
 
 export const DEV_AUTH_SECRET = "soft-spark-dev-secret-change-me-32chars!!";
 
+/** Header for POST /internal/orchestrate in production. Never commit a value. */
+export const INTERNAL_JOB_HEADER = "x-internal-job-secret";
+
 export function isProduction(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.NODE_ENV === "production";
+}
+
+/** Same gate as authMode() prod: AUTH_MODE=prod or NODE_ENV=production. */
+export function internalRoutesLocked(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.AUTH_MODE === "prod" || env.NODE_ENV === "production";
+}
+
+export function internalJobSecret(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const value = env.INTERNAL_JOB_SECRET;
+  return value ? value : undefined;
+}
+
+function secretsEqual(provided: string, expected: string): boolean {
+  const a = createHash("sha256").update(provided, "utf8").digest();
+  const b = createHash("sha256").update(expected, "utf8").digest();
+  return timingSafeEqual(a, b);
+}
+
+/** True when the request presents INTERNAL_JOB_SECRET. Unset secret never authorizes. */
+export function internalJobAuthorized(
+  providedSecret: string | undefined | null,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const expected = internalJobSecret(env);
+  if (!expected || !providedSecret) return false;
+  return secretsEqual(providedSecret, expected);
 }
 
 export function isPostgresUrl(url: string | undefined): url is string {

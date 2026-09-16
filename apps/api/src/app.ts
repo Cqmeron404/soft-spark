@@ -18,7 +18,12 @@ import type { PushDispatcher } from "./push.js";
 import type { RealtimeHub } from "./realtime.js";
 import type { SparkStore } from "./store.js";
 import { honoCors } from "./cors.js";
-import { healthPayload } from "./env.js";
+import {
+  healthPayload,
+  INTERNAL_JOB_HEADER,
+  internalJobAuthorized,
+  internalRoutesLocked,
+} from "./env.js";
 
 export type AppEnv = {
   Variables: { userId: string; authId: string };
@@ -320,6 +325,17 @@ export function createApp(deps: AppDeps) {
         await stream.sleep(15000);
       }
     });
+  });
+
+  app.use("/internal/*", (c, next) => {
+    if (!internalRoutesLocked()) return next();
+    if (c.req.path === "/internal/events" || c.req.path.startsWith("/internal/events/")) {
+      return c.json({ error: "not_found" }, 404);
+    }
+    if (!internalJobAuthorized(c.req.header(INTERNAL_JOB_HEADER))) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    return next();
   });
 
   app.post("/internal/orchestrate", async (c) => {

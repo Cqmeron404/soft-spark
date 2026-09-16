@@ -15,7 +15,7 @@ import { createApp } from "./app.js";
 import { bootstrap } from "./bootstrap.js";
 import { webOrigins } from "./cors.js";
 import { ensureDemoUsers } from "./demo-users.js";
-import { allowDemoUsers, bootMissing, placesMissing } from "./env.js";
+import { allowDemoUsers, bootMissing, INTERNAL_JOB_HEADER, placesMissing } from "./env.js";
 import { runNexusSoakScenarios } from "./nexus-soak.js";
 import { createEngine, orchestrateMatch } from "./orchestrate.js";
 
@@ -37,6 +37,106 @@ type MatchRes = {
 
 async function json<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
+}
+
+async function assertInternalRouteLock(
+  app: ReturnType<typeof createApp>,
+  failures: string[]
+) {
+  const prev = {
+    NODE_ENV: process.env.NODE_ENV,
+    AUTH_MODE: process.env.AUTH_MODE,
+    INTERNAL_JOB_SECRET: process.env.INTERNAL_JOB_SECRET,
+  };
+  const restore = () => {
+    for (const [key, value] of Object.entries(prev)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  };
+
+  try {
+    delete process.env.NODE_ENV;
+    delete process.env.AUTH_MODE;
+    delete process.env.INTERNAL_JOB_SECRET;
+
+    const openEvents = await app.request("/internal/events");
+    if (openEvents.status !== 200) {
+      failures.push(`dev GET /internal/events expected 200, got ${openEvents.status}`);
+    } else console.log("ok  local GET /internal/events open when not prod");
+
+    const openOrch = await app.request("/internal/orchestrate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    if (openOrch.status !== 400) {
+      failures.push(`dev POST /internal/orchestrate expected 400 (need two users), got ${openOrch.status}`);
+    } else console.log("ok  local POST /internal/orchestrate open when not prod");
+
+    process.env.NODE_ENV = "production";
+    const prodEvents = await app.request("/internal/events");
+    const prodEventsBody = await json<{ error?: string }>(prodEvents);
+    if (prodEvents.status !== 404 || prodEventsBody.error !== "not_found") {
+      failures.push(
+        `prod GET /internal/events expected 404 not_found, got ${prodEvents.status} ${JSON.stringify(prodEventsBody)}`
+      );
+    } else console.log("ok  prod GET /internal/events → 404");
+
+    const prodOrch = await app.request("/internal/orchestrate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    if (prodOrch.status !== 401) {
+      failures.push(`prod POST /internal/orchestrate without secret expected 401, got ${prodOrch.status}`);
+    } else console.log("ok  prod POST /internal/orchestrate without secret → 401");
+
+    process.env.INTERNAL_JOB_SECRET = "demo-internal-job-test-secret";
+    const wrong = await app.request("/internal/orchestrate", {
+      method: "POST",
+      headers: { "content-type": "application/json", [INTERNAL_JOB_HEADER]: "wrong" },
+      body: "{}",
+    });
+    if (wrong.status !== 401) {
+      failures.push(`prod POST /internal/orchestrate wrong secret expected 401, got ${wrong.status}`);
+    } else console.log("ok  prod POST /internal/orchestrate wrong secret → 401");
+
+    const authed = await app.request("/internal/orchestrate", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [INTERNAL_JOB_HEADER]: "demo-internal-job-test-secret",
+      },
+      body: "{}",
+    });
+    if (authed.status !== 400) {
+      failures.push(
+        `prod POST /internal/orchestrate with secret expected 400 (need two users), got ${authed.status}`
+      );
+    } else console.log("ok  prod POST /internal/orchestrate with secret reaches job");
+
+    const stillHidden = await app.request("/internal/events", {
+      headers: { [INTERNAL_JOB_HEADER]: "demo-internal-job-test-secret" },
+    });
+    if (stillHidden.status !== 404) {
+      failures.push(`prod GET /internal/events with secret still expected 404, got ${stillHidden.status}`);
+    } else console.log("ok  prod GET /internal/events stays 404 even with secret");
+
+    delete process.env.NODE_ENV;
+    process.env.AUTH_MODE = "prod";
+    delete process.env.INTERNAL_JOB_SECRET;
+    const authModeOrch = await app.request("/internal/orchestrate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    if (authModeOrch.status !== 401) {
+      failures.push(`AUTH_MODE=prod POST /internal/orchestrate expected 401, got ${authModeOrch.status}`);
+    } else console.log("ok  AUTH_MODE=prod locks POST /internal/orchestrate");
+  } finally {
+    restore();
+  }
 }
 
 function cookiesFrom(res: Response): string {
@@ -121,6 +221,8 @@ async function main() {
   const unauth = await app.request("/matches");
   if (unauth.status !== 401) failures.push(`protected /matches expected 401, got ${unauth.status}`);
   else console.log("ok  unauthenticated GET /matches → 401");
+
+  await assertInternalRouteLock(app, failures);
 
   const noOpt = await app.request("/users/me/onboard", {
     method: "POST",

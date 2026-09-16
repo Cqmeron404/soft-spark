@@ -3,7 +3,13 @@ import { Readable } from "node:stream";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { corsAllowOrigin, honoCors } from "./cors.js";
-import { bootMissing, healthPayload } from "./env.js";
+import {
+  bootMissing,
+  healthPayload,
+  INTERNAL_JOB_HEADER,
+  internalJobAuthorized,
+  internalRoutesLocked,
+} from "./env.js";
 import { getApp } from "./server.js";
 
 export const runtime = "nodejs";
@@ -56,6 +62,22 @@ function isHealthPath(path: string): boolean {
 /** Hobby rewrite sends every GET to `/api`; treat that GET as `/health`. */
 function isHealthAlias(path: string): boolean {
   return path === "/api" || path === "/api/" || path === "/" || isHealthPath(path);
+}
+
+function stripApiMountPath(path: string): string {
+  if (path === "/api" || path === "/api/") return "/";
+  if (path.startsWith("/api/")) return path.slice("/api".length) || "/";
+  return path;
+}
+
+function isInternalEventsPath(path: string): boolean {
+  const p = stripApiMountPath(path).replace(/\/+$/, "") || "/";
+  return p === "/internal/events";
+}
+
+function isInternalOrchestratePath(path: string): boolean {
+  const p = stripApiMountPath(path).replace(/\/+$/, "") || "/";
+  return p === "/internal/orchestrate";
 }
 
 function collectPaths(input: IncomingLike): string[] {
@@ -371,6 +393,16 @@ gateway.all("*", async (c) => {
   }
   if (paths.some(isHealthPath)) {
     return healthRoute(c);
+  }
+  if (internalRoutesLocked() && paths.some(isInternalEventsPath)) {
+    return c.json({ error: "not_found" }, 404);
+  }
+  if (
+    internalRoutesLocked() &&
+    paths.some(isInternalOrchestratePath) &&
+    !internalJobAuthorized(c.req.header(INTERNAL_JOB_HEADER))
+  ) {
+    return c.json({ error: "unauthorized" }, 401);
   }
   const started = await getApp();
   return started.fetch(c.req.raw);
