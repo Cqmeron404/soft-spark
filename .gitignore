@@ -3,6 +3,7 @@ node_modules
 dist
 .next
 .expo
+.data
 *.log
 .env
 .env.local

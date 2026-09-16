@@ -66,6 +66,7 @@ export type UserDto = {
   gender: string;
   interestedIn: string[];
   bio?: string;
+  photoUrl?: string;
   homeGeo: Geo;
   homeTz: string;
   prefs: {
@@ -98,4 +99,5 @@ export type OnboardBody = {
   homeGeo: Geo;
   homeTz?: string;
   vibeTags?: string[];
+  photoUrl?: string;
 };

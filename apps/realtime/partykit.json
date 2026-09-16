@@ -1,0 +1,7 @@
+{
+  "name": "soft-spark-realtime",
+  "main": "src/server.ts",
+  "parties": {
+    "match": "src/server.ts"
+  }
+}

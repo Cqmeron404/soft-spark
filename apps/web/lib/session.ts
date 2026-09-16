@@ -22,6 +22,11 @@ export function writeSession(user: SessionUser): void {
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
+export function clearSession(): void {
+  localStorage.removeItem(KEY);
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
+
 export function readKnownUsers(): SessionUser[] {
   if (typeof window === "undefined") return [];
   const raw = localStorage.getItem(USERS_KEY);

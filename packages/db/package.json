@@ -8,12 +8,18 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "seed": "tsx src/seed.ts"
   },
   "dependencies": {
-    "drizzle-orm": "^0.38.3"
+    "@electric-sql/pglite": "^0.3.7",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.5"
   },
   "devDependencies": {
+    "@types/node": "^22.10.5",
+    "drizzle-kit": "^0.30.4",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
 }

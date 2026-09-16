@@ -1,6 +1,7 @@
 "use client";
 
 import type { InviteUserStatus, PriceTier } from "@soft-spark/shared";
+import { formatMilesFromKm } from "@soft-spark/shared";
 import { tokens } from "./tokens";
 import { DualStatusRow } from "./DualStatusRow";
 
@@ -43,7 +44,7 @@ export function InviteCard(props: {
         {props.cuisine} · {priceLabel(props.priceTier)} · {props.neighborhood}
       </p>
       <p style={{ margin: 0, fontSize: 14 }}>
-        {props.travelKmYou.toFixed(1)} km from you · {props.travelKmThem.toFixed(1)} km from them
+        {formatMilesFromKm(props.travelKmYou)} mi from you · {formatMilesFromKm(props.travelKmThem)} mi from them
       </p>
       <p style={{ margin: 0, fontSize: 14 }}>{props.windowLabel}</p>
       <DualStatusRow

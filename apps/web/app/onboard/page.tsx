@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OnboardBody } from "@soft-spark/shared";
+import { PhotoCrop } from "@soft-spark/ui";
 import { onboard } from "@/lib/api";
+import { getAuthSession } from "@/lib/auth";
 import { writeSession } from "@/lib/session";
 
 const MAYA: OnboardBody = {
@@ -54,6 +56,7 @@ const VIBES = ["Curious", "Bold", "Soft", "Witty"] as const;
 
 export default function OnboardPage() {
   const router = useRouter();
+  const [ready, setReady] = useState(false);
   const [optIn, setOptIn] = useState(false);
   const [name, setName] = useState("");
   const [age, setAge] = useState("29");
@@ -63,8 +66,20 @@ export default function OnboardPage() {
   const [maxTravelKm, setMaxTravelKm] = useState("25");
   const [lat, setLat] = useState("39.739");
   const [lng, setLng] = useState("-104.979");
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void getAuthSession().then((data) => {
+      if (!data?.user) {
+        router.replace("/signin");
+        return;
+      }
+      if (!name) setName(data.user.name ?? "");
+      setReady(true);
+    });
+  }, [router]);
 
   function apply(preset: OnboardBody) {
     setName(preset.profile.displayName);
@@ -101,6 +116,7 @@ export default function OnboardPage() {
         homeGeo: { lat: Number(lat), lng: Number(lng) },
         homeTz: "America/Denver",
         vibeTags,
+        photoUrl,
       };
       const res = await onboard(body);
       writeSession({ id: res.user.id, displayName: res.user.displayName });
@@ -112,6 +128,8 @@ export default function OnboardPage() {
     }
   }
 
+  if (!ready) return <p>Catching up…</p>;
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 32, margin: 0 }}>
@@ -120,6 +138,7 @@ export default function OnboardPage() {
       <p style={{ color: "var(--ss-text-muted)", margin: 0 }}>
         It’ll explore chemistry for you — you only show up when there’s a real invite
       </p>
+      <PhotoCrop name={name} value={photoUrl} onChange={setPhotoUrl} />
       <div style={{ display: "flex", gap: 8 }}>
         <button type="button" className="ss-btn ss-btn-ghost" onClick={() => apply(MAYA)}>
           Fill Maya
@@ -187,7 +206,7 @@ export default function OnboardPage() {
         I want an AI bot to date on my behalf
       </label>
       {error ? <p style={{ color: "var(--ss-danger)" }}>{error}</p> : null}
-      <button type="button" className="ss-btn ss-btn-primary" disabled={busy} onClick={submit}>
+      <button type="button" className="ss-btn ss-btn-primary" disabled={busy} onClick={() => void submit()}>
         Continue
       </button>
     </div>

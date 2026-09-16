@@ -1,3 +1,4 @@
+/** Aura token pass: update these hex values; drop SVG/PNG into /brand without blocking eng. */
 export const tokens = {
   bg: "#F7F1EA",
   surface: "#FFF8F2",

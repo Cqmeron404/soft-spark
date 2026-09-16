@@ -1,12 +1,18 @@
 import {
   CONSTANTS,
   canEnterInviteReady,
+  chemistryFromTranscript,
+  createCatalogPlaceProvider,
+  createGooglePlaceProvider,
+  createLlmChemistryJudge,
+  createLlmConversationRunner,
+  createMidpointVenueSuggester,
   createStubConversationRunner,
   createStubMatchScorer,
   createStubSafetyGate,
-  createStubVenueSuggester,
   dimsForTurn,
   earlyExitLowFit,
+  llmConfigured,
   passesHardFilter,
   profileFit,
   type MatchScorer,
@@ -14,10 +20,11 @@ import {
   type SafetyGate,
   type VenueSuggester,
 } from "@soft-spark/match-engine";
-import { EVENTS, isHomeCardReason } from "@soft-spark/shared";
+import { EVENTS, isHomeCardReason, type ClientRealtimeEvent } from "@soft-spark/shared";
 import type { EventLog } from "./event-log.js";
+import type { RealtimeHub } from "./realtime.js";
 import { snapshotFor } from "./snapshot.js";
-import type { MatchRecord, MemoryStore } from "./store.js";
+import type { MatchRecord, SparkStore } from "./store.js";
 import { nextInviteWindow } from "./window.js";
 
 export type Engine = {
@@ -27,50 +34,102 @@ export type Engine = {
   venues: VenueSuggester;
 };
 
-export function createEngine(
-  store: MemoryStore,
+export async function createEngine(
+  store: SparkStore,
   options?: { emptyVenues?: boolean }
-): Engine {
+): Promise<Engine> {
+  const stubRunner = createStubConversationRunner();
+  const modeLlm = llmConfigured({
+    MATCH_ENGINE_MODE: process.env.MATCH_ENGINE_MODE,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  });
+  const runner = modeLlm
+    ? createLlmConversationRunner(
+        {
+          apiKey: process.env.OPENAI_API_KEY,
+          baseUrl: process.env.OPENAI_BASE_URL,
+          model: process.env.OPENAI_MODEL,
+        },
+        stubRunner
+      )
+    : stubRunner;
+  const catalog = await store.listCatalog();
+  const googleKey = process.env.GOOGLE_PLACES_API_KEY;
+  const provider = googleKey
+    ? createGooglePlaceProvider({ apiKey: googleKey })
+    : createCatalogPlaceProvider(catalog);
   return {
     scorer: createStubMatchScorer(async (matchId) => {
-      const match = store.matches.get(matchId);
+      const match = await store.getMatch(matchId);
       if (!match) throw new Error(`match ${matchId} not found`);
       return {
-        a: snapshotFor(store, match.userAId),
-        b: snapshotFor(store, match.userBId),
+        a: await snapshotFor(store, match.userAId),
+        b: await snapshotFor(store, match.userBId),
         chemistryDims: match.chemistryDims,
         safetyOk: match.safetyOk,
       };
     }),
-    runner: createStubConversationRunner(),
+    runner,
     safety: createStubSafetyGate(),
-    venues: createStubVenueSuggester({ empty: options?.emptyVenues }),
+    venues: createMidpointVenueSuggester({
+      provider: options?.emptyVenues ? createCatalogPlaceProvider([]) : provider,
+      empty: options?.emptyVenues,
+    }),
   };
 }
 
+async function publishClient(
+  store: SparkStore,
+  hub: RealtimeHub | undefined,
+  type: ClientRealtimeEvent["type"],
+  matchId: string
+) {
+  if (!hub) return;
+  const match = await store.getMatch(matchId);
+  if (!match) return;
+  const invite = await store.inviteForMatch(matchId);
+  const event: ClientRealtimeEvent = {
+    type,
+    matchId,
+    state: match.state,
+    band: match.band,
+    reasons: match.reasons.filter(isHomeCardReason).slice(0, 2),
+    invite: invite
+      ? {
+          id: invite.id,
+          status: invite.status,
+          userAStatus: invite.userAStatus,
+          userBStatus: invite.userBStatus,
+        }
+      : undefined,
+  };
+  await hub.publish([match.userAId, match.userBId], event);
+}
+
 export async function orchestrateMatch(input: {
-  store: MemoryStore;
+  store: SparkStore;
   events: EventLog;
   engine: Engine;
   userAId: string;
   userBId: string;
+  hub?: RealtimeHub;
 }): Promise<MatchRecord> {
-  const { store, events, engine } = input;
+  const { store, events, engine, hub } = input;
   if (input.userAId === input.userBId) {
     throw Object.assign(new Error("cannot match a user with themselves"), {
       status: 400,
     });
   }
-  const existing = store.existingPair(input.userAId, input.userBId);
+  const existing = await store.existingPair(input.userAId, input.userBId);
   if (existing) return existing;
 
-  const a = snapshotFor(store, input.userAId);
-  const b = snapshotFor(store, input.userBId);
+  const a = await snapshotFor(store, input.userAId);
+  const b = await snapshotFor(store, input.userBId);
   if (!passesHardFilter(a, b)) {
     throw Object.assign(new Error("hard_filter_failed"), { status: 409 });
   }
 
-  const match = store.createMatch({
+  let match = await store.createMatch({
     userAId: input.userAId,
     userBId: input.userBId,
     state: "exploring",
@@ -81,15 +140,25 @@ export async function orchestrateMatch(input: {
     profileFit: 0,
     chemistry: 0,
     logistics: 0,
-    chemistryDims: dimsForTurn(0, true),
+    chemistryDims: dimsForTurn(0, false),
   });
-  const convo = store.createConversation(match.id);
-  const botA = store.botForUser(input.userAId);
-  const botB = store.botForUser(input.userBId);
+  const convo = await store.createConversation(match.id);
+  const botA = await store.botForUser(input.userAId);
+  const botB = await store.botForUser(input.userBId);
   if (!botA || !botB) throw new Error("dating bot missing");
 
   const started = Date.now();
   const maxMs = CONSTANTS.MAX_MINUTES * 60 * 1000;
+  const judge = llmConfigured({
+    MATCH_ENGINE_MODE: process.env.MATCH_ENGINE_MODE,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  })
+    ? createLlmChemistryJudge({
+        apiKey: process.env.OPENAI_API_KEY,
+        baseUrl: process.env.OPENAI_BASE_URL,
+        model: process.env.OPENAI_MODEL,
+      })
+    : undefined;
 
   for (let turn = 1; turn <= CONSTANTS.MAX_TURNS; turn++) {
     if (Date.now() - started > maxMs) {
@@ -107,7 +176,7 @@ export async function orchestrateMatch(input: {
 
     events.emit(EVENTS.BOT_TURN_REQUESTED, { matchId: match.id, botId: bot.id });
 
-    const history = store.messagesFor(convo.id).map((m) => ({
+    const history = (await store.messagesFor(convo.id)).map((m) => ({
       role: m.role,
       text: m.text,
       at: m.createdAt,
@@ -122,7 +191,7 @@ export async function orchestrateMatch(input: {
     const gate = await engine.safety.checkMessage(result.text, { matchId: match.id });
     const safety = !result.safety.ok ? result.safety : gate;
 
-    store.addMessage({
+    await store.addMessage({
       conversationId: convo.id,
       role: aTurn ? "botA" : "botB",
       text: result.text,
@@ -136,7 +205,7 @@ export async function orchestrateMatch(input: {
     });
 
     if (!safety.ok) {
-      store.updateMatch(match.id, {
+      await store.updateMatch(match.id, {
         state: "archived",
         safetyOk: false,
         confidence: 0,
@@ -151,13 +220,21 @@ export async function orchestrateMatch(input: {
         matchId: match.id,
         reason: `safety_fail:${safety.code}`,
       });
-      return store.matches.get(match.id)!;
+      return (await store.getMatch(match.id))!;
     }
 
-    store.updateMatch(match.id, { chemistryDims: dimsForTurn(turn, true) });
+    const dims = await chemistryFromTranscript(
+      (await store.messagesFor(convo.id)).map((m) => ({
+        role: m.role,
+        text: m.text,
+        at: m.createdAt,
+      })),
+      { snapshots: { a, b }, judge }
+    );
+    match = await store.updateMatch(match.id, { chemistryDims: dims });
     const pf = profileFit(a, b).value;
     const chemistry =
-      Object.values(store.matches.get(match.id)!.chemistryDims).reduce((s, n) => s + n, 0) / 5;
+      Object.values(match.chemistryDims).reduce((s, n) => s + n, 0) / 5;
     if (earlyExitLowFit(turn, chemistry, pf)) {
       events.emit(EVENTS.MATCH_ARCHIVED, {
         matchId: match.id,
@@ -172,7 +249,7 @@ export async function orchestrateMatch(input: {
 
   const scored = await engine.scorer.score(match.id);
   const homeReasons = scored.reasons.filter(isHomeCardReason).slice(0, 2);
-  store.updateMatch(match.id, {
+  match = await store.updateMatch(match.id, {
     confidence: scored.confidence,
     band: scored.band,
     reasons: homeReasons,
@@ -187,11 +264,13 @@ export async function orchestrateMatch(input: {
     band: scored.band,
     reasons: homeReasons,
   });
+  await publishClient(store, hub, "match.score.updated", match.id);
 
-  const userA = store.users.get(input.userAId)!;
-  const userB = store.users.get(input.userBId)!;
-  const prefsA = store.prefsForUser(input.userAId);
-  const prefsB = store.prefsForUser(input.userBId);
+  const userA = await store.getUser(input.userAId);
+  const userB = await store.getUser(input.userBId);
+  const prefsA = await store.prefsForUser(input.userAId);
+  const prefsB = await store.prefsForUser(input.userBId);
+  if (!userA || !userB) throw new Error("user missing");
 
   if (scored.safetyOk && scored.confidence >= CONSTANTS.INVITE_THRESHOLD) {
     const suggested = await engine.venues.suggestVenue({
@@ -214,26 +293,29 @@ export async function orchestrateMatch(input: {
         matchId: match.id,
         confidence: scored.confidence,
       });
-      return store.updateMatch(match.id, { state: "exploring" });
+      match = await store.updateMatch(match.id, { state: "exploring" });
+      await publishClient(store, hub, "match.venue_unavailable", match.id);
+      return match;
     }
     if (gate.ok) {
       const pick = suggested.candidates[0];
-      store.updateMatch(match.id, { state: "invite_ready" });
+      match = await store.updateMatch(match.id, { state: "invite_ready" });
       events.emit(EVENTS.MATCH_INVITE_READY, {
         matchId: match.id,
         venueCandidates: suggested.candidates,
       });
-      const venue = store.createVenue({
+      await publishClient(store, hub, "match.invite_ready", match.id);
+      const venue = await store.createVenue({
         name: pick.name,
         cuisine: pick.cuisine,
         priceTier: pick.priceTier,
         approxNeighborhood: pick.approxNeighborhood,
         lat: (userA.homeLat + userB.homeLat) / 2,
         lng: (userA.homeLng + userB.homeLng) / 2,
-        source: "stub",
+        source: process.env.GOOGLE_PLACES_API_KEY ? "places" : "catalog",
       });
       const window = nextInviteWindow(userA.homeTz || "America/Denver");
-      const invite = store.createInvite({
+      const invite = await store.createInvite({
         matchId: match.id,
         venueId: venue.id,
         windowStart: window.start,
@@ -258,23 +340,26 @@ export async function orchestrateMatch(input: {
         },
         window,
       });
-      return store.updateMatch(match.id, { state: "invited" });
+      match = await store.updateMatch(match.id, { state: "invited" });
+      await publishClient(store, hub, "invite.sent", match.id);
+      return match;
     }
   }
 
-  return store.matches.get(match.id)!;
+  return (await store.getMatch(match.id))!;
 }
 
-export function respondInvite(input: {
-  store: MemoryStore;
+export async function respondInvite(input: {
+  store: SparkStore;
   events: EventLog;
   matchId: string;
   inviteId: string;
   userId: string;
   action: "accept" | "decline";
-}): { match: MatchRecord } {
-  const match = input.store.matches.get(input.matchId);
-  const invite = input.store.invites.get(input.inviteId);
+  hub?: RealtimeHub;
+}): Promise<{ match: MatchRecord }> {
+  const match = await input.store.getMatch(input.matchId);
+  const invite = await input.store.getInvite(input.inviteId);
   if (!match || !invite || invite.matchId !== match.id) {
     throw Object.assign(new Error("not_found"), { status: 404 });
   }
@@ -298,7 +383,7 @@ export function respondInvite(input: {
       userId: input.userId,
     });
     if (userAStatus === "accepted" && userBStatus === "accepted") {
-      input.store.updateInvite(invite.id, {
+      await input.store.updateInvite(invite.id, {
         userAStatus,
         userBStatus,
         status: "booked",
@@ -307,10 +392,13 @@ export function respondInvite(input: {
         matchId: match.id,
         inviteId: invite.id,
       });
-      return { match: input.store.updateMatch(match.id, { state: "booked" }) };
+      const booked = await input.store.updateMatch(match.id, { state: "booked" });
+      await publishClient(input.store, input.hub, "invite.booked", match.id);
+      return { match: booked };
     }
-    input.store.updateInvite(invite.id, { userAStatus, userBStatus });
-    return { match: input.store.matches.get(match.id)! };
+    await input.store.updateInvite(invite.id, { userAStatus, userBStatus });
+    await publishClient(input.store, input.hub, "invite.accepted", match.id);
+    return { match: (await input.store.getMatch(match.id))! };
   }
 
   if (match.state === "declined" || invite.status === "declined") {
@@ -321,7 +409,7 @@ export function respondInvite(input: {
   }
   const userAStatus = isA ? "declined" : invite.userAStatus;
   const userBStatus = isA ? invite.userBStatus : "declined";
-  input.store.updateInvite(invite.id, {
+  await input.store.updateInvite(invite.id, {
     userAStatus,
     userBStatus,
     status: "declined",
@@ -330,5 +418,7 @@ export function respondInvite(input: {
     matchId: match.id,
     userId: input.userId,
   });
-  return { match: input.store.updateMatch(match.id, { state: "declined" }) };
+  const declined = await input.store.updateMatch(match.id, { state: "declined" });
+  await publishClient(input.store, input.hub, "invite.declined", match.id);
+  return { match: declined };
 }

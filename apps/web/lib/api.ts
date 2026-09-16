@@ -1,20 +1,32 @@
-import type { MatchDetail, MatchListItem, OnboardBody } from "@soft-spark/shared";
+import type { MatchDetail, MatchListItem, OnboardBody, UserDto } from "@soft-spark/shared";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
-export async function api<T>(
-  path: string,
-  options: RequestInit & { userId?: string | null } = {}
-): Promise<T> {
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
-  headers.set("content-type", "application/json");
-  if (options.userId) headers.set("x-user-id", options.userId);
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  if (!headers.has("content-type") && options.body) headers.set("content-type", "application/json");
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("soft-spark.auth-token");
+    if (token && !headers.has("authorization")) headers.set("authorization", `Bearer ${token}`);
+  }
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+    const err = new Error((data as { error?: string }).error ?? `HTTP ${res.status}`) as Error & {
+      status: number;
+    };
+    err.status = res.status;
+    throw err;
   }
   return data as T;
+}
+
+export function getMe() {
+  return api<UserDto>("/users/me");
 }
 
 export function onboard(body: OnboardBody) {
@@ -24,31 +36,32 @@ export function onboard(body: OnboardBody) {
   );
 }
 
-export function listMatches(userId: string) {
-  return api<MatchListItem[]>("/matches", { userId });
+export function listMatches() {
+  return api<MatchListItem[]>("/matches");
 }
 
-export function getMatch(userId: string, id: string) {
-  return api<MatchDetail>(`/matches/${id}`, { userId });
+export function getMatch(id: string) {
+  return api<MatchDetail>(`/matches/${id}`);
 }
 
-export function acceptInvite(userId: string, matchId: string, inviteId: string) {
-  return api<MatchDetail>(`/matches/${matchId}/invites/${inviteId}/accept`, {
-    method: "POST",
-    userId,
-  });
+export function acceptInvite(matchId: string, inviteId: string) {
+  return api<MatchDetail>(`/matches/${matchId}/invites/${inviteId}/accept`, { method: "POST" });
 }
 
-export function declineInvite(userId: string, matchId: string, inviteId: string) {
-  return api<MatchDetail>(`/matches/${matchId}/invites/${inviteId}/decline`, {
-    method: "POST",
-    userId,
-  });
+export function declineInvite(matchId: string, inviteId: string) {
+  return api<MatchDetail>(`/matches/${matchId}/invites/${inviteId}/decline`, { method: "POST" });
 }
 
 export function orchestrate(userAId?: string, userBId?: string) {
   return api<{ matchId: string; state: string; band: string }>("/internal/orchestrate", {
     method: "POST",
     body: JSON.stringify({ userAId, userBId }),
+  });
+}
+
+export function patchBot(body: { paused?: boolean; vibeTags?: string[] }) {
+  return api<{ id: string; paused: boolean }>("/users/me/bot", {
+    method: "PATCH",
+    body: JSON.stringify(body),
   });
 }

@@ -1,0 +1,16 @@
+{
+  "name": "@soft-spark/realtime",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "partykit dev",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "partykit": "^0.0.111"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

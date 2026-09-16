@@ -54,3 +54,24 @@
   color: var(--ss-danger);
   border: 1px solid var(--ss-danger);
 }
+
+.ss-band-chip {
+  animation: ss-crossfade 280ms ease;
+}
+
+.ss-signal-swap {
+  animation: ss-crossfade 280ms ease;
+}
+
+.ss-status-pill {
+  transition: background 220ms ease, color 220ms ease, transform 220ms ease;
+}
+
+@keyframes ss-crossfade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

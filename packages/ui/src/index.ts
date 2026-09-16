@@ -5,3 +5,4 @@ export { MatchCard } from "./MatchCard";
 export { InviteCard, priceLabel } from "./InviteCard";
 export { DualStatusRow } from "./DualStatusRow";
 export { RevealSheet } from "./RevealSheet";
+export { ConnectingCaption, SoftToast, BrandMark, PhotoCrop } from "./chrome";

@@ -30,6 +30,7 @@ export type SafetyCode =
 export type SafetyResult = { ok: true } | { ok: false; code: SafetyCode };
 
 export type UserProfileSnapshot = {
+  displayName?: string;
   looking_for: "relationship" | "casual" | "unsure";
   age: number;
   gender: string;

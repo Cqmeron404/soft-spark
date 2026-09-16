@@ -1,8 +1,12 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { cors } from "hono/cors";
+import { streamSSE } from "hono/streaming";
+import type { SparkDb } from "@soft-spark/db";
 import type { LookingFor, OnboardBody, PriceTier } from "@soft-spark/shared";
-import { eventLog } from "./event-log.js";
+import type { Auth } from "./auth.js";
+import { authMode, resolveSession } from "./auth.js";
+import type { EventLog } from "./event-log.js";
 import {
   assertClientSafe,
   toBotDto,
@@ -11,26 +15,55 @@ import {
   toUserDto,
 } from "./map-client.js";
 import { createEngine, orchestrateMatch, respondInvite } from "./orchestrate.js";
-import { store } from "./store.js";
+import type { RealtimeHub } from "./realtime.js";
+import type { SparkStore } from "./store.js";
 
 export type AppEnv = {
-  Variables: { userId: string };
+  Variables: { userId: string; authId: string };
 };
 
-export function createApp() {
+export type AppDeps = {
+  store: SparkStore;
+  auth: Auth;
+  hub: RealtimeHub;
+  events: EventLog;
+  db: SparkDb;
+};
+
+export function createApp(deps: AppDeps) {
+  const { store, auth, hub, events, db } = deps;
   const app = new Hono<AppEnv>();
+  const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
   app.use(
     "/*",
     cors({
-      origin: "*",
+      origin: (origin) => origin || webOrigin,
+      credentials: true,
       allowHeaders: ["Content-Type", "Authorization", "x-user-id"],
       allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
     })
   );
 
-  app.get("/health", (c) => c.json({ ok: true, service: "soft-spark-api" }));
+  app.get("/health", (c) =>
+    c.json({
+      ok: true,
+      service: "soft-spark-api",
+      authMode: authMode(),
+      matchEngine: process.env.MATCH_ENGINE_MODE ?? "stub",
+    })
+  );
+
+  app.on(["POST", "GET"], "/auth/*", (c) => auth.handler(c.req.raw));
+
+  app.use("/users/me/*", (c, next) => requireSession(c, next, { store, auth, db }));
+  app.use("/users/me", (c, next) => requireSession(c, next, { store, auth, db }));
+  app.use("/matches/*", (c, next) => requireSession(c, next, { store, auth, db }));
+  app.use("/matches", (c, next) => requireSession(c, next, { store, auth, db }));
+  app.use("/realtime/*", (c, next) => requireSession(c, next, { store, auth, db }));
 
   app.post("/users/me/onboard", async (c) => {
+    const authId = c.get("authId");
+    if (!authId) return c.json({ error: "unauthorized" }, 401);
     const body = (await c.req.json()) as OnboardBody;
     if (body.botDatingOptIn !== true) {
       return c.json({ error: "botDatingOptIn required" }, 400);
@@ -45,127 +78,173 @@ export function createApp() {
     }
     if (!body.homeGeo) return c.json({ error: "homeGeo required" }, 400);
 
-    const user = store.createUser({
-      displayName: profile.displayName,
-      age: profile.age,
-      gender: profile.gender,
-      interestedIn: profile.interestedIn ?? [],
-      bio: profile.bio,
-      homeLat: body.homeGeo.lat,
-      homeLng: body.homeGeo.lng,
-      homeTz: body.homeTz ?? "America/Denver",
-      botDatingOptIn: true,
-    });
-    store.createPrefs({
-      userId: user.id,
-      cuisine: prefs.cuisine,
-      budget: prefs.budget as PriceTier,
-      maxTravelKm: prefs.maxTravelKm,
-      dealbreakers: prefs.dealbreakers ?? [],
-      lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
-      interests: prefs.interests ?? [],
-    });
-    const bot = store.createBot({
-      userId: user.id,
-      vibeTags: body.vibeTags ?? [],
-      active: true,
-      paused: false,
-    });
-    const payload = { user: toUserDto(store, user.id), bot: toBotDto(store, user.id) };
+    const session = await resolveSession(auth, db, c.req.raw.headers);
+    const email = session?.user.email ?? `${authId}@users.softspark`;
+    const existing = await store.userByAuthId(authId);
+    const user = existing
+      ? await store.updateUser(existing.id, {
+          displayName: profile.displayName,
+          age: profile.age,
+          gender: profile.gender,
+          interestedIn: profile.interestedIn ?? [],
+          bio: profile.bio,
+          photoUrl: body.photoUrl,
+          homeLat: body.homeGeo.lat,
+          homeLng: body.homeGeo.lng,
+          homeTz: body.homeTz ?? "America/Denver",
+        })
+      : await store.createUser({
+          authId,
+          email,
+          displayName: profile.displayName,
+          age: profile.age,
+          gender: profile.gender,
+          interestedIn: profile.interestedIn ?? [],
+          bio: profile.bio,
+          photoUrl: body.photoUrl,
+          homeLat: body.homeGeo.lat,
+          homeLng: body.homeGeo.lng,
+          homeTz: body.homeTz ?? "America/Denver",
+          botDatingOptIn: true,
+        });
+
+    if (!(await store.botForUser(user.id))) {
+      await store.createBot({
+        userId: user.id,
+        vibeTags: body.vibeTags ?? [],
+        active: true,
+        paused: false,
+      });
+    } else if (body.vibeTags) {
+      await store.updateBot(user.id, { vibeTags: body.vibeTags });
+    }
+
+    try {
+      await store.prefsForUser(user.id);
+      await store.updatePrefs(user.id, {
+        cuisine: prefs.cuisine,
+        budget: prefs.budget as PriceTier,
+        maxTravelKm: prefs.maxTravelKm,
+        dealbreakers: prefs.dealbreakers ?? [],
+        lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
+        interests: prefs.interests ?? [],
+      });
+    } catch {
+      await store.createPrefs({
+        userId: user.id,
+        cuisine: prefs.cuisine,
+        budget: prefs.budget as PriceTier,
+        maxTravelKm: prefs.maxTravelKm,
+        dealbreakers: prefs.dealbreakers ?? [],
+        lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
+        interests: prefs.interests ?? [],
+      });
+    }
+
+    const payload = { user: await toUserDto(store, user.id), bot: await toBotDto(store, user.id) };
     assertClientSafe(payload);
-    return c.json(payload, 201);
+    return c.json(payload, existing ? 200 : 201);
   });
 
-  app.use("/users/me/*", requireSession);
-  app.use("/users/me", requireSession);
-  app.use("/matches/*", requireSession);
-  app.use("/matches", requireSession);
-
-  app.get("/users/me", (c) => {
+  app.get("/users/me", async (c) => {
     const userId = c.get("userId");
-    const payload = toUserDto(store, userId);
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    const payload = await toUserDto(store, userId);
     assertClientSafe(payload);
     return c.json(payload);
   });
 
   app.patch("/users/me", async (c) => {
     const userId = c.get("userId");
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
     const body = await c.req.json();
-    const user = store.users.get(userId);
+    const user = await store.getUser(userId);
     if (!user) return c.json({ error: "not_found" }, 404);
-    const prefs = store.prefsForUser(userId);
-    if (body.profile) {
-      Object.assign(user, {
-        displayName: body.profile.displayName ?? user.displayName,
-        age: body.profile.age ?? user.age,
-        gender: body.profile.gender ?? user.gender,
-        interestedIn: body.profile.interestedIn ?? user.interestedIn,
-        bio: body.profile.bio ?? user.bio,
-        updatedAt: new Date().toISOString(),
+    if (body.profile || body.homeGeo || body.photoUrl) {
+      await store.updateUser(userId, {
+        displayName: body.profile?.displayName,
+        age: body.profile?.age,
+        gender: body.profile?.gender,
+        interestedIn: body.profile?.interestedIn,
+        bio: body.profile?.bio,
+        photoUrl: body.photoUrl ?? body.profile?.photoUrl,
+        homeLat: body.homeGeo?.lat,
+        homeLng: body.homeGeo?.lng,
       });
-    }
-    if (body.homeGeo) {
-      user.homeLat = body.homeGeo.lat;
-      user.homeLng = body.homeGeo.lng;
     }
     if (body.prefs) {
-      Object.assign(prefs, {
-        cuisine: body.prefs.cuisine ?? prefs.cuisine,
-        budget: body.prefs.budget ?? prefs.budget,
-        maxTravelKm: body.prefs.maxTravelKm ?? prefs.maxTravelKm,
-        dealbreakers: body.prefs.dealbreakers ?? prefs.dealbreakers,
-        lookingFor: body.prefs.lookingFor ?? prefs.lookingFor,
-        interests: body.prefs.interests ?? prefs.interests,
+      await store.updatePrefs(userId, {
+        cuisine: body.prefs.cuisine,
+        budget: body.prefs.budget,
+        maxTravelKm: body.prefs.maxTravelKm,
+        dealbreakers: body.prefs.dealbreakers,
+        lookingFor: body.prefs.lookingFor,
+        interests: body.prefs.interests,
       });
     }
-    return c.json(toUserDto(store, userId));
+    return c.json(await toUserDto(store, userId));
   });
 
-  app.get("/users/me/bot", (c) => {
-    return c.json(toBotDto(store, c.get("userId")));
+  app.get("/users/me/bot", async (c) => {
+    const userId = c.get("userId");
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    return c.json(await toBotDto(store, userId));
   });
 
   app.patch("/users/me/bot", async (c) => {
     const userId = c.get("userId");
-    const bot = store.botForUser(userId);
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    const bot = await store.botForUser(userId);
     if (!bot) return c.json({ error: "not_found" }, 404);
     const body = await c.req.json();
-    if (Array.isArray(body.vibeTags)) bot.vibeTags = body.vibeTags;
-    if (typeof body.paused === "boolean") bot.paused = body.paused;
-    if (typeof body.active === "boolean") bot.active = body.active;
-    return c.json(toBotDto(store, userId));
+    const payload = await store.updateBot(userId, {
+      vibeTags: Array.isArray(body.vibeTags) ? body.vibeTags : undefined,
+      paused: typeof body.paused === "boolean" ? body.paused : undefined,
+      active: typeof body.active === "boolean" ? body.active : undefined,
+    });
+    return c.json({
+      id: payload.id,
+      vibeTags: payload.vibeTags,
+      active: payload.active,
+      paused: payload.paused,
+    });
   });
 
-  app.get("/matches", (c) => {
+  app.get("/matches", async (c) => {
     const userId = c.get("userId");
-    const payload = store.matchesForUser(userId).map((m) => toMatchListItem(store, m.id, userId));
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    const payload = await Promise.all(
+      (await store.matchesForUser(userId)).map((m) => toMatchListItem(store, m.id, userId))
+    );
     assertClientSafe(payload);
     return c.json(payload);
   });
 
-  app.get("/matches/:id", (c) => {
+  app.get("/matches/:id", async (c) => {
     const userId = c.get("userId");
-    const match = store.matches.get(c.req.param("id"));
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    const match = await store.getMatch(c.req.param("id"));
     if (!match) return c.json({ error: "not_found" }, 404);
     if (match.userAId !== userId && match.userBId !== userId) {
       return c.json({ error: "forbidden" }, 403);
     }
-    const payload = toMatchDetail(store, match.id, userId);
+    const payload = await toMatchDetail(store, match.id, userId);
     assertClientSafe(payload);
     return c.json(payload);
   });
 
-  app.post("/matches/:id/invites/:inviteId/accept", (c) => {
+  app.post("/matches/:id/invites/:inviteId/accept", async (c) => {
     try {
-      const { match } = respondInvite({
+      const { match } = await respondInvite({
         store,
-        events: eventLog,
+        events,
+        hub,
         matchId: c.req.param("id"),
         inviteId: c.req.param("inviteId"),
         userId: c.get("userId"),
         action: "accept",
       });
-      const payload = toMatchDetail(store, match.id, c.get("userId"));
+      const payload = await toMatchDetail(store, match.id, c.get("userId"));
       assertClientSafe(payload);
       return c.json(payload);
     } catch (err) {
@@ -173,17 +252,18 @@ export function createApp() {
     }
   });
 
-  app.post("/matches/:id/invites/:inviteId/decline", (c) => {
+  app.post("/matches/:id/invites/:inviteId/decline", async (c) => {
     try {
-      const { match } = respondInvite({
+      const { match } = await respondInvite({
         store,
-        events: eventLog,
+        events,
+        hub,
         matchId: c.req.param("id"),
         inviteId: c.req.param("inviteId"),
         userId: c.get("userId"),
         action: "decline",
       });
-      const payload = toMatchDetail(store, match.id, c.get("userId"));
+      const payload = await toMatchDetail(store, match.id, c.get("userId"));
       assertClientSafe(payload);
       return c.json(payload);
     } catch (err) {
@@ -191,16 +271,37 @@ export function createApp() {
     }
   });
 
+  app.get("/realtime/stream", (c) => {
+    const userId = c.get("userId");
+    if (!userId) return c.json({ error: "unauthorized" }, 401);
+    return streamSSE(c, async (stream) => {
+      let alive = true;
+      const unsub = hub.subscribe(userId, (event) => {
+        if (!alive) return;
+        void stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
+      });
+      stream.onAbort(() => {
+        alive = false;
+        unsub();
+      });
+      while (alive) {
+        await stream.writeSSE({ event: "ping", data: "{}" });
+        await stream.sleep(15000);
+      }
+    });
+  });
+
   app.post("/internal/orchestrate", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const ids = [body.userAId, body.userBId].filter(Boolean);
-    const users = ids.length === 2 ? ids : lastTwoUserIds();
+    const users = ids.length === 2 ? ids : await store.lastUserIds(2);
     if (users.length < 2) return c.json({ error: "need two onboarded users" }, 400);
     try {
-      const engine = createEngine(store, { emptyVenues: Boolean(body.emptyVenues) });
+      const engine = await createEngine(store, { emptyVenues: Boolean(body.emptyVenues) });
       const match = await orchestrateMatch({
         store,
-        events: eventLog,
+        events,
+        hub,
         engine,
         userAId: users[0],
         userBId: users[1],
@@ -216,33 +317,43 @@ export function createApp() {
     }
   });
 
-  app.get("/internal/events", (c) => c.json(eventLog.events));
+  app.get("/internal/events", (c) => c.json(events.events));
 
   return app;
 }
 
-function lastTwoUserIds(): string[] {
-  return [...store.users.values()]
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .slice(-2)
-    .map((u) => u.id);
-}
+async function requireSession(
+  c: Context<AppEnv>,
+  next: Next,
+  deps: { store: SparkStore; auth: Auth; db: SparkDb }
+) {
+  const headers = new Headers(c.req.raw.headers);
+  const access = c.req.query("access_token");
+  if (access && !headers.get("authorization")) {
+    headers.set("authorization", `Bearer ${access}`);
+  }
+  const session = await resolveSession(deps.auth, deps.db, headers);
+  if (session?.user?.id) {
+    c.set("authId", session.user.id);
+    const profile = await deps.store.userByAuthId(session.user.id);
+    if (profile) c.set("userId", profile.id);
+    return next();
+  }
 
-function sessionUserId(c: { req: { header: (n: string) => string | undefined } }): string | null {
-  const header = c.req.header("x-user-id");
-  if (header) return header;
-  const auth = c.req.header("authorization");
-  if (auth?.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
-  return null;
-}
-
-async function requireSession(c: Context<AppEnv>, next: Next) {
-  const userId = sessionUserId(c);
-  if (!userId || !store.users.has(userId)) {
+  if (authMode() === "prod") {
     return c.json({ error: "unauthorized" }, 401);
   }
-  c.set("userId", userId);
-  await next();
+
+  const header = c.req.header("x-user-id");
+  if (header) {
+    const user = await deps.store.getUser(header);
+    if (!user) return c.json({ error: "unauthorized" }, 401);
+    c.set("userId", user.id);
+    c.set("authId", user.authId);
+    return next();
+  }
+
+  return c.json({ error: "unauthorized" }, 401);
 }
 
 function handleErr(c: { json: (body: unknown, status: 400 | 401 | 403 | 404 | 409 | 500) => Response }, err: unknown) {
