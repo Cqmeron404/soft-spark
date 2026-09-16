@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, ne, or } from "drizzle-orm";
 import {
   conversations,
   datingBots,
@@ -118,6 +118,8 @@ export type InviteRecord = {
   travelKmA: number;
   travelKmB: number;
   why: string;
+  carryCueA?: string;
+  carryCueB?: string;
   createdAt: string;
 };
 
@@ -261,6 +263,8 @@ function asInvite(row: typeof invites.$inferSelect): InviteRecord {
     travelKmA: row.travelKmA,
     travelKmB: row.travelKmB,
     why: row.why,
+    carryCueA: row.carryCueA ?? undefined,
+    carryCueB: row.carryCueB ?? undefined,
     createdAt: iso(row.createdAt),
   };
 }
@@ -505,6 +509,8 @@ export function createDbStore(db: SparkDb) {
           travelKmA: input.travelKmA,
           travelKmB: input.travelKmB,
           why: input.why,
+          carryCueA: input.carryCueA,
+          carryCueB: input.carryCueB,
         })
         .returning();
       return asInvite(row);
@@ -525,6 +531,8 @@ export function createDbStore(db: SparkDb) {
             status: patch.status,
             userAStatus: patch.userAStatus,
             userBStatus: patch.userBStatus,
+            carryCueA: patch.carryCueA,
+            carryCueB: patch.carryCueB,
           })
         )
         .where(eq(invites.id, id))
@@ -565,6 +573,14 @@ export function createDbStore(db: SparkDb) {
     async lastUserIds(n = 2): Promise<string[]> {
       const rows = await db.select().from(users).orderBy(desc(users.createdAt));
       return rows.slice(0, n).reverse().map((u) => u.id);
+    },
+    async listOtherUserIds(userId: string): Promise<string[]> {
+      const rows = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.status, "active"), ne(users.id, userId)))
+        .orderBy(users.createdAt);
+      return rows.map((u) => u.id);
     },
     async upsertPushDevice(input: {
       userId: string;

@@ -3,16 +3,20 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ClientRealtimeEvent, MatchListItem } from "@soft-spark/shared";
-import { ConnectingCaption, EmptyState, MatchCard, SoftToast } from "@soft-spark/ui";
-import { listMatches, orchestrate } from "@/lib/api";
+import { ConnectingCaption, MatchCard, SoftToast } from "@soft-spark/ui";
+import { BotSearchAction } from "@/components/BotSearchAction";
+import { listMatches } from "@/lib/api";
 import { useMatchRealtime } from "@/lib/realtime";
 import { readSession } from "@/lib/session";
+
+function isLiveMatch(state: string) {
+  return state === "exploring" || state === "invite_ready" || state === "invited" || state === "booked";
+}
 
 export default function MatchesPage() {
   const router = useRouter();
   const [items, setItems] = useState<MatchListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
   const [toast, setToast] = useState<{ matchId: string } | null>(null);
 
   async function load() {
@@ -49,16 +53,8 @@ export default function MatchesPage() {
     });
   });
 
-  async function runJob() {
-    setError(null);
-    try {
-      const result = await orchestrate();
-      setNote(`Match ${result.state} · ${result.band}`);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Orchestrate failed");
-    }
-  }
+  const liveItems = items?.filter((m) => isLiveMatch(m.state)) ?? [];
+  const showSearch = items !== null && liveItems.length === 0;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -66,10 +62,6 @@ export default function MatchesPage() {
         Your bots are out
       </h1>
       <ConnectingCaption live={live} />
-      <button type="button" className="ss-btn ss-btn-primary" onClick={() => void runJob()}>
-        Run match job (demo)
-      </button>
-      {note ? <p style={{ color: "var(--ss-text-muted)", margin: 0 }}>{note}</p> : null}
       {toast ? (
         <SoftToast
           message="You’re both almost there — open invite"
@@ -79,12 +71,7 @@ export default function MatchesPage() {
         />
       ) : null}
       {error ? <p className="ss-error">{error === "unauthorized" ? "Sign in to keep your bot dating" : error}</p> : null}
-      {items && items.length === 0 ? (
-        <EmptyState
-          title="No active matches yet — your bot’s exploring"
-          body="We’ll ping you when chemistry builds."
-        />
-      ) : null}
+      {showSearch ? <BotSearchAction /> : null}
       <div style={{ display: "grid", gap: 12 }}>
         {items?.map((m) => (
           <MatchCard

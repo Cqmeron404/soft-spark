@@ -13,7 +13,7 @@ import {
   toMatchListItem,
   toUserDto,
 } from "./map-client.js";
-import { createEngine, orchestrateMatch, respondInvite } from "./orchestrate.js";
+import { createEngine, orchestrateMatch, respondInvite, searchMatchForUser } from "./orchestrate.js";
 import type { PushDispatcher } from "./push.js";
 import type { RealtimeHub } from "./realtime.js";
 import type { SparkStore } from "./store.js";
@@ -254,6 +254,32 @@ export function createApp(deps: AppDeps) {
     return c.json(payload);
   });
 
+  app.post("/matches/search", async (c) => {
+    const userId = c.get("userId");
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    try {
+      const result = await searchMatchForUser({
+        store,
+        events,
+        hub,
+        push,
+        userId,
+      });
+      const payload = {
+        found: Boolean(result.match),
+        estimatedSeconds: result.estimatedSeconds,
+        match: result.match ? await toMatchDetail(store, result.match.id, userId) : undefined,
+        message: result.match
+          ? undefined
+          : "No date yet — your bot will keep looking",
+      };
+      assertClientSafe(payload);
+      return c.json(payload);
+    } catch (err) {
+      return handleErr(c, err);
+    }
+  });
+
   app.get("/matches/:id", async (c) => {
     const userId = c.get("userId");
     if (!userId) return c.json({ error: "profile_incomplete" }, 404);
@@ -269,6 +295,7 @@ export function createApp(deps: AppDeps) {
 
   app.post("/matches/:id/invites/:inviteId/accept", async (c) => {
     try {
+      const body = (await c.req.json().catch(() => ({}))) as { carryCue?: string };
       const { match } = await respondInvite({
         store,
         events,
@@ -278,6 +305,7 @@ export function createApp(deps: AppDeps) {
         inviteId: c.req.param("inviteId"),
         userId: c.get("userId"),
         action: "accept",
+        carryCue: body.carryCue,
       });
       const payload = await toMatchDetail(store, match.id, c.get("userId"));
       assertClientSafe(payload);

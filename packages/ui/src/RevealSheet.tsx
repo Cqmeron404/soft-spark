@@ -34,19 +34,7 @@ export function RevealSheet(props: {
       <p style={{ margin: 0, fontSize: 16, lineHeight: 1.4 }}>
         {props.peerName} · Your bots found real chemistry
       </p>
-      <button
-        type="button"
-        onClick={props.onSeeInvite}
-        style={{
-          minHeight: 44,
-          border: "none",
-          borderRadius: tokens.radiusButton,
-          background: tokens.accent,
-          color: tokens.text,
-          fontWeight: 600,
-          fontSize: 16,
-        }}
-      >
+      <button type="button" className="ss-btn ss-btn-primary" onClick={props.onSeeInvite}>
         See the invite
       </button>
       <button

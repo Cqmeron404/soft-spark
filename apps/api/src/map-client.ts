@@ -91,6 +91,8 @@ export async function toMatchDetail(
       },
       you: isA ? invite.userAStatus : invite.userBStatus,
       them: isA ? invite.userBStatus : invite.userAStatus,
+      youCarryCue: isA ? invite.carryCueA : invite.carryCueB,
+      themCarryCue: isA ? invite.carryCueB : invite.carryCueA,
     },
   };
 }
