@@ -39,7 +39,7 @@ export default function SignInPage() {
     void authenticate(email, password);
   }
 
-  function demoSignIn(account: (typeof DEMO_ACCOUNTS)["maya"]) {
+  function demoSignIn(account: (typeof DEMO_ACCOUNTS)[keyof typeof DEMO_ACCOUNTS]) {
     setEmail(account.email);
     setPassword(account.password);
     void authenticate(account.email, account.password);
