@@ -11,5 +11,3 @@ dist
 coverage
 *.tsbuildinfo
 .vercel
-apps/api/api/index.js
-apps/api/api/index.js.map

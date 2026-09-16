@@ -54,7 +54,7 @@ Live deploy needs **host secrets**. This repo does **not** invent credentials. W
 | Surface | Config | Notes |
 |---------|--------|--------|
 | Web | `apps/web/vercel.json` + root `vercel.json` | Vercel project Root Directory = `apps/web` (or deploy from repo root). Set `NEXT_PUBLIC_API_URL`. |
-| API | `apps/api/vercel.json` + `apps/api/Dockerfile` | Vercel Root Directory = `apps/api`. `installCommand` / `buildCommand` run from the **repo root** so `@soft-spark/db` (and siblings) emit `dist/` JS. Serverless `maxDuration` 60s (SSE degraded). Docker is preferred for long-lived Node. |
+| API | `apps/api/vercel.json` + `apps/api/Dockerfile` | Vercel Root Directory = `apps/api`, Framework **Other** (`framework: null`). Serverless entry is committed `apps/api/api/index.ts` — `functions` must glob that source file (a generated `api/index.js` will fail the build). `installCommand` / `buildCommand` still run from the **repo root** so workspace packages emit `dist/` JS. `maxDuration` 60s (SSE degraded). Docker is preferred for long-lived Node. |
 | Checklist | `bash scripts/deploy.sh check` | Prints which required vars are missing (values never printed). |
 | VAPID | `bash scripts/deploy.sh vapid` | `npx web-push generate-vapid-keys` — do not commit keys. |
 
@@ -97,7 +97,7 @@ LLM soak (optional; stub fallback if missing). **Rollback = `MATCH_ENGINE_MODE=s
 
 Copy `.env.example` locally. Set the same names in Vercel / Fly / Render dashboards.
 
-**Blockers for a live URL from this PR:** this change is aimed at `/health` JSON on `https://soft-spark-api.vercel.app` after merge + redeploy (Hobby env is already wired). Workspace packages now ship `dist/` JS (`exports` no longer point at raw `.ts`). After merge: redeploy the API project.
+**Blockers for a live URL from this PR:** this change is aimed at `/health` JSON on `https://soft-spark-api.vercel.app` after merge + redeploy (Hobby env is already wired: `ALLOW_VENUE_SEED=1`, `MATCH_ENGINE_MODE` stub default). Workspace packages ship `dist/` JS; the Hobby function entry is `apps/api/api/index.ts`. After merge: redeploy the API project.
 
 ## Env vars
 
