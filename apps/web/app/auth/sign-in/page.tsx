@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppLogo, SoftError } from "@soft-spark/ui";
+import { DEMO_ACCOUNTS } from "@soft-spark/shared";
 import { getMe } from "@/lib/api";
 import { signInEmail } from "@/lib/auth";
 import { writeSession } from "@/lib/session";
@@ -63,8 +64,8 @@ export default function SignInPage() {
           type="button"
           className="ss-btn ss-btn-ghost"
           onClick={() => {
-            setEmail("maya@softspark.dev");
-            setPassword("spark-demo-maya");
+            setEmail(DEMO_ACCOUNTS.maya.email);
+            setPassword(DEMO_ACCOUNTS.maya.password);
           }}
         >
           Maya demo
@@ -73,8 +74,8 @@ export default function SignInPage() {
           type="button"
           className="ss-btn ss-btn-ghost"
           onClick={() => {
-            setEmail("jordan@softspark.dev");
-            setPassword("spark-demo-jordan");
+            setEmail(DEMO_ACCOUNTS.jordan.email);
+            setPassword(DEMO_ACCOUNTS.jordan.password);
           }}
         >
           Jordan demo

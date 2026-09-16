@@ -29,7 +29,7 @@ pnpm soak    # alias of demo; stub by default
 pnpm test    # invite_threshold 0.75 soak + demo
 ```
 
-`pnpm demo` (and `pnpm soak`) signs up two Denver users (Maya, Jordan) via Better Auth, onboards (photoUrl), runs hard-filter → persona bot turns → transcript-derived chemistry → midpoint venues → dual accept, and asserts **booked**. It also checks prod boot/Places guards (seed flags skip Places), 401s, paused bots (one + both), client payloads without `confidence` / transcripts / `messages[]`, `match.venue_unavailable` keeping `exploring`, intent soft mismatch, safety inject → `match.safety_failed`, early `low_fit_early_exit`, rollback `MATCH_ENGINE_MODE=stub`, LLM down stub fallback, DualStatusRow copy, and restart survival.
+`pnpm demo` (and `pnpm soak`) signs up two Denver users (Maya, Jordan) via Better Auth, onboards (photoUrl), runs hard-filter → persona bot turns → transcript-derived chemistry → midpoint venues → dual accept, and asserts **booked**. It also checks prod boot/Places guards (seed flags skip Places), 401s, paused bots (one + both), client payloads without `confidence` / transcripts / `messages[]`, `match.venue_unavailable` keeping `exploring`, intent soft mismatch, safety inject → `match.safety_failed`, early `low_fit_early_exit`, rollback `MATCH_ENGINE_MODE=stub`, LLM down stub fallback, DualStatusRow copy, restart survival, and idempotent live-demo user seed (Maya/Jordan UI credentials).
 
 Persona turns must still clear **invite_threshold 0.75** — the threshold is frozen; do not lower it if soak dips.
 
@@ -58,7 +58,9 @@ Live deploy needs **host secrets**. This repo does **not** invent credentials. W
 | Checklist | `bash scripts/deploy.sh check` | Prints which required vars are missing (values never printed). |
 | VAPID | `bash scripts/deploy.sh vapid` | `npx web-push generate-vapid-keys` — do not commit keys. |
 
-**Boot (`NODE_ENV=production`)** refuses to start without `DATABASE_URL` (`postgres://…`) and `BETTER_AUTH_SECRET` (not the dev default). Missing Google Places does **not** fail boot when `ALLOW_VENUE_SEED=1` or `VENUE_MODE=seed`. `/health` reports `venues` as `seed` | `places` plus boolean env flags (no secret values).
+**Boot (`NODE_ENV=production`)** refuses to start without `DATABASE_URL` (`postgres://…`) and `BETTER_AUTH_SECRET` (not the dev default). Missing Google Places does **not** fail boot when `ALLOW_VENUE_SEED=1` or `VENUE_MODE=seed`. `/health` reports `venues` as `seed` | `places` plus boolean env flags (no secret values), including `env.demoUsers`.
+
+On API start (Hobby cold start included), the process **idempotently ensures** Maya (`maya@softspark.dev` / `spark-demo-maya`) and Jordan (`jordan@softspark.dev` / `spark-demo-jordan`): Better Auth accounts, onboarded dating profiles, and a stub match so one-tap sign-in on `https://soft-spark.vercel.app/auth/sign-in` reaches `/matches`. Default **on**; set `ALLOW_DEMO_USERS=0` to disable. No extra Vercel env is required after merge + **API** redeploy. Seed uses the stub engine (skips auto-match when `MATCH_ENGINE_MODE=llm` so boot does not spend OpenAI).
 
 ### Prod go-live secrets (exact)
 
@@ -120,6 +122,7 @@ pnpm --filter @soft-spark/db exec drizzle-kit push
 | `WEB_ORIGIN` | prod | Exact web origin(s) for CORS + Better Auth `trustedOrigins`. No trailing slash. Comma-separated if needed. Live: `https://soft-spark.vercel.app`. |
 | `GOOGLE_PLACES_API_KEY` | prod Places | Nearby search when seed is **not** forced. 0 results → `exploring` + `match.venue_unavailable`. |
 | `ALLOW_VENUE_SEED` | $0 venues | `1` allows Denver catalog seed **and** catalog VenueSuggester in production (no Places key). |
+| `ALLOW_DEMO_USERS` | live one-tap | Default **on**. API boot ensures Maya/Jordan accounts matching the web sign-in buttons. Set `0` to disable. |
 | `VENUE_MODE` | $0 venues | `seed` same as `ALLOW_VENUE_SEED=1`. Forced seed wins over a present Places key. Unset + key → `places`. |
 | `MATCH_ENGINE_MODE` | always | `stub` (default / **rollback**) or `llm`. Stub never calls OpenAI even if a key is set. Mode=`llm` without `OPENAI_API_KEY` forces stub + log. |
 | `OPENAI_API_KEY` | llm | Chat Completions for `ConversationRunner` + optional chemistry judge. |
@@ -140,7 +143,7 @@ Protected routes (`/users/me/*`, `/matches*`, `/realtime/*`) require a Better Au
 
 | Method | Path | Notes |
 |--------|------|--------|
-| GET | `/health` | `{ ok, venues: "seed"\|"places", matchEngine, env: { database, authSecret, places, llm, webPush } }` — no secrets |
+| GET | `/health` | `{ ok, venues: "seed"\|"places", matchEngine, env: { database, authSecret, places, llm, webPush, demoUsers } }` — no secrets |
 | GET | `/push/vapid-public` | `{ configured, publicKey }` for web push subscribe |
 | POST/GET | `/auth/*` | Better Auth |
 | POST | `/users/me/onboard` | Session required. `botDatingOptIn: true` else **400**. Optional `photoUrl` |

@@ -1,5 +1,6 @@
 import { createApp, type AppDeps } from "./app.js";
 import { bootstrap } from "./bootstrap.js";
+import { maybeEnsureDemoUsers } from "./demo-users.js";
 import { envFlags, validateBootEnv } from "./env.js";
 
 export type StartedApp = {
@@ -22,6 +23,15 @@ export async function startApp(): Promise<StartedApp> {
     push: ctx.push,
   };
   const app = createApp(deps);
+  await maybeEnsureDemoUsers({
+    app,
+    auth: ctx.auth,
+    db: ctx.db,
+    store: ctx.store,
+    events: ctx.events,
+    hub: ctx.hub,
+    push: ctx.push,
+  });
   return {
     fetch: (request) => app.fetch(request),
     close: ctx.close,

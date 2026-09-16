@@ -490,6 +490,7 @@ async function withPgliteAuthEnv<T>(fn: () => Promise<T>): Promise<T> {
     MATCH_ENGINE_MODE: process.env.MATCH_ENGINE_MODE,
     PGLITE_DATA_DIR: process.env.PGLITE_DATA_DIR,
     BODY_READ_TIMEOUT_MS: process.env.BODY_READ_TIMEOUT_MS,
+    ALLOW_DEMO_USERS: process.env.ALLOW_DEMO_USERS,
   };
   delete process.env.DATABASE_URL;
   delete process.env.NODE_ENV;
@@ -497,6 +498,7 @@ async function withPgliteAuthEnv<T>(fn: () => Promise<T>): Promise<T> {
   process.env.BETTER_AUTH_URL = "https://soft-spark-api.vercel.app";
   process.env.ALLOW_VENUE_SEED = "1";
   process.env.MATCH_ENGINE_MODE = "stub";
+  process.env.ALLOW_DEMO_USERS = "0";
   process.env.PGLITE_DATA_DIR = `.data/pglite-gateway-${process.pid}`;
   try {
     return await fn();
