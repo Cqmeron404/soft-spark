@@ -5,6 +5,7 @@ import { getApp } from "./server.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 function isHealthPath(url: string): boolean {
   try {
