@@ -95,7 +95,7 @@ function cloneRequest(url: URL | string, request: Request): Request {
   return new Request(url, init);
 }
 
-function incomingBody(input: Request | IncomingMessage | IncomingLike): BodyInit | undefined {
+function incomingBody(input: Request | IncomingMessage | IncomingLike): RequestInit["body"] {
   if (input instanceof Request) return input.body ?? undefined;
   const stream = input as IncomingMessage;
   if (typeof stream.pipe === "function" && typeof stream.on === "function" && !stream.readableEnded) {
@@ -103,7 +103,7 @@ function incomingBody(input: Request | IncomingMessage | IncomingLike): BodyInit
   }
   const body = (input as IncomingLike).body;
   if (typeof body === "string" || body instanceof Uint8Array || body instanceof ArrayBuffer) {
-    return body as BodyInit;
+    return body as RequestInit["body"];
   }
   return undefined;
 }
