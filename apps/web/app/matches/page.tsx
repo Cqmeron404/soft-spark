@@ -80,7 +80,10 @@ export default function MatchesPage() {
       ) : null}
       {error ? <p className="ss-error">{error === "unauthorized" ? "Sign in to keep your bot dating" : error}</p> : null}
       {items && items.length === 0 ? (
-        <EmptyState title="No active matches yet — your bot’s exploring" />
+        <EmptyState
+          title="No active matches yet — your bot’s exploring"
+          body="We’ll ping you when chemistry builds."
+        />
       ) : null}
       <div style={{ display: "grid", gap: 12 }}>
         {items?.map((m) => (
@@ -89,6 +92,7 @@ export default function MatchesPage() {
             peerName={m.peer?.displayName ?? "Someone"}
             band={m.band}
             reasons={m.reasons}
+            photoUrl={m.peer?.photoUrl}
             onOpen={() => {
               if (m.state === "invite_ready" || m.state === "invited" || m.state === "booked") {
                 router.push(`/matches/${m.id}/reveal`);

@@ -197,3 +197,17 @@ export const invites = pgTable("invites", {
   why: text("why").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** Web Push subscription or Expo token. Status-only payloads (frozen A). */
+export const pushDevices = pgTable("push_devices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  platform: text("platform").notNull(),
+  endpoint: text("endpoint"),
+  p256dh: text("p256dh"),
+  auth: text("auth"),
+  expoToken: text("expo_token"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});

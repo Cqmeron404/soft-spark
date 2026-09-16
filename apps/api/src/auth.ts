@@ -9,12 +9,13 @@ import {
   verification,
   type SparkDb,
 } from "@soft-spark/db";
+import { DEV_AUTH_SECRET } from "./env.js";
 
 export function createAuth(db: SparkDb) {
   const secret =
     process.env.BETTER_AUTH_SECRET ??
     process.env.AUTH_SECRET ??
-    "soft-spark-dev-secret-change-me-32chars!!";
+    DEV_AUTH_SECRET;
   const baseURL = process.env.BETTER_AUTH_URL ?? process.env.API_URL ?? "http://localhost:8787";
   const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
   return betterAuth({

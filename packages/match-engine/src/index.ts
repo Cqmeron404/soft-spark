@@ -9,4 +9,5 @@ export * from "./stubs";
 export * from "./chemistry";
 export * from "./llm";
 export * from "./venue-provider";
+export * from "./regression";
 

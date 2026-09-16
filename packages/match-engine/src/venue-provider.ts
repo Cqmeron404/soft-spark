@@ -130,6 +130,19 @@ function asSnapshot(u: SuggestVenueInput["userA"]): UserProfileSnapshot {
   };
 }
 
+/** Prod: GOOGLE_PLACES_API_KEY is required behind VenueSuggester (seed catalog is local/demo). */
+export function assertPlacesKeyInProd(
+  env: { NODE_ENV?: string; GOOGLE_PLACES_API_KEY?: string },
+  options?: { empty?: boolean }
+): void {
+  if (options?.empty) return;
+  if (env.NODE_ENV === "production" && !env.GOOGLE_PLACES_API_KEY) {
+    throw new Error(
+      "GOOGLE_PLACES_API_KEY required when NODE_ENV=production (VenueSuggester). Seed catalog is local/demo only."
+    );
+  }
+}
+
 /**
  * Real mid-point VenueSuggester: provider fetch → Nexus filter
  * (mid ∩ maxTravelKm ∩ cuisine ∩ budget → ≤3). Empty candidates are valid.

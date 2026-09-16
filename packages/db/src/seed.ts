@@ -3,6 +3,10 @@ import { openDb } from "./client";
 import { seedVenueCatalog } from "./seed-data";
 
 async function main() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_VENUE_SEED !== "1") {
+    console.error("Venue catalog seed is local/demo only. Prod uses Google Places (GOOGLE_PLACES_API_KEY).");
+    process.exit(1);
+  }
   const opened = await openDb();
   await applySchema(opened.db);
   const n = await seedVenueCatalog(opened.db);

@@ -41,7 +41,7 @@ export default function Home() {
           {TAGLINE}
         </h1>
         <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 16, lineHeight: 1.4 }}>
-          Blind dates, agent-matched. While your bots explore chemistry, you only see status — then a real invite.
+          Blind dates, agent-matched. Status only until both of you accept the same invite.
         </p>
       </div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>

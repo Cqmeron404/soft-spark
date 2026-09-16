@@ -52,7 +52,7 @@ export async function toMatchListItem(
     state: match.state,
     band: match.band,
     updatedAt: match.updatedAt,
-    peer: peer ? { displayName: peer.displayName } : undefined,
+    peer: peer ? { displayName: peer.displayName, photoUrl: peer.photoUrl } : undefined,
     reasons: match.reasons.filter(isHomeCardReason).slice(0, 2),
   };
 }

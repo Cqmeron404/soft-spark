@@ -8,12 +8,14 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "test": "tsx --test src/regression.test.ts"
   },
   "dependencies": {
     "@soft-spark/shared": "workspace:*"
   },
   "devDependencies": {
+    "tsx": "^4.23.13",
     "typescript": "^5.7.3"
   }
 }

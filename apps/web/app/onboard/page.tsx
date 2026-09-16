@@ -69,6 +69,7 @@ export default function OnboardPage() {
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
     void getAuthSession().then((data) => {
@@ -120,7 +121,8 @@ export default function OnboardPage() {
       };
       const res = await onboard(body);
       writeSession({ id: res.user.id, displayName: res.user.displayName });
-      router.push("/matches");
+      setDone(true);
+      window.setTimeout(() => router.push("/matches"), 1400);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not onboard");
     } finally {
@@ -129,6 +131,16 @@ export default function OnboardPage() {
   }
 
   if (!ready) return <p>Catching up…</p>;
+
+  if (done) {
+    return (
+      <div style={{ display: "grid", gap: 12 }}>
+        <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 32, margin: 0 }}>
+          Your bot’s ready. We’ll ping you when chemistry builds
+        </h1>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "grid", gap: 16 }}>

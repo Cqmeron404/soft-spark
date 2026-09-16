@@ -8,6 +8,7 @@ import {
   createLlmConversationRunner as createNexusLlmConversationRunner,
   type LlmComplete,
 } from "./llm-conversation-runner";
+import { createStubConversationRunner } from "./stubs";
 import type {
   BotTurnInput,
   BotTurnResult,
@@ -71,17 +72,31 @@ export function createOpenAiComplete(env: LlmEnv, extras?: { temperature?: numbe
 
 export function createLlmConversationRunner(
   env: LlmEnv,
-  _fallback?: ConversationRunner
+  fallback?: ConversationRunner
 ): ConversationRunner {
+  const stub = fallback ?? createStubConversationRunner();
+  if (!env.apiKey) {
+    return {
+      async runBotTurn(input) {
+        const result = await stub.runBotTurn(input);
+        return { ...result, fallback: true };
+      },
+    };
+  }
   const nexus = createNexusLlmConversationRunner(createOpenAiComplete(env));
   return {
     async runBotTurn(input: BotTurnInput): Promise<BotTurnResult> {
-      const result = await nexus.runBotTurn(toNexusInput(input));
-      if (result.safety.ok) return { text: result.text, safety: { ok: true } };
-      return {
-        text: result.text,
-        safety: { ok: false, code: result.safety.code as SafetyCode },
-      };
+      try {
+        const result = await nexus.runBotTurn(toNexusInput(input));
+        if (result.safety.ok) return { text: result.text, safety: { ok: true } };
+        return {
+          text: result.text,
+          safety: { ok: false, code: result.safety.code as SafetyCode },
+        };
+      } catch {
+        const fb = await stub.runBotTurn(input);
+        return { ...fb, fallback: true };
+      }
     },
   };
 }
@@ -97,5 +112,27 @@ export function llmConfigured(env: {
   MATCH_ENGINE_MODE?: string;
   OPENAI_API_KEY?: string;
 }): boolean {
-  return env.MATCH_ENGINE_MODE === "llm" && Boolean(env.OPENAI_API_KEY);
+  return resolveMatchEngineMode(env).usedLlm;
+}
+
+/**
+ * Rollback: MATCH_ENGINE_MODE=stub (or unset) never calls the LLM, even if a key is present.
+ * Mode=llm without OPENAI_API_KEY forces stub and returns a log line (do not invent a key).
+ */
+export function resolveMatchEngineMode(env: {
+  MATCH_ENGINE_MODE?: string;
+  OPENAI_API_KEY?: string;
+}): { mode: "stub" | "llm"; usedLlm: boolean; log?: string } {
+  const requested = env.MATCH_ENGINE_MODE === "llm" ? "llm" : "stub";
+  if (requested === "stub") {
+    return { mode: "stub", usedLlm: false };
+  }
+  if (!env.OPENAI_API_KEY) {
+    return {
+      mode: "stub",
+      usedLlm: false,
+      log: "MATCH_ENGINE_MODE=llm but OPENAI_API_KEY missing — forcing stub (no secret invented)",
+    };
+  }
+  return { mode: "llm", usedLlm: true };
 }

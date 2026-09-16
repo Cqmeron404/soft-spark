@@ -15,6 +15,10 @@
     "demo": {
       "cache": false,
       "dependsOn": ["^typecheck"]
+    },
+    "test": {
+      "cache": false,
+      "dependsOn": ["^typecheck"]
     }
   }
 }

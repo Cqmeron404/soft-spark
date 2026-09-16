@@ -65,4 +65,4 @@ curl -s -X POST "$API/matches/$MATCH_ID/invites/$INVITE_ID/accept" "${maya_h[@]}
 booked=$(curl -s -X POST "$API/matches/$MATCH_ID/invites/$INVITE_ID/accept" "${jordan_h[@]}")
 node -e 'const m=JSON.parse(process.argv[1]); if (m.state!=="booked") process.exit(1); console.log("ok  dual accept → booked")' "$booked"
 
-echo "Slice 2 HTTP demo complete."
+echo "Slice 3 HTTP demo complete."

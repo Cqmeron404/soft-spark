@@ -1,7 +1,7 @@
 "use client";
 
 import type { InviteUserStatus, PriceTier } from "@soft-spark/shared";
-import { formatMilesFromKm } from "@soft-spark/shared";
+import { formatMilesFromKm, inviteIsBooked, inviteIsClosed } from "@soft-spark/shared";
 import { tokens } from "./tokens";
 import { DualStatusRow } from "./DualStatusRow";
 
@@ -20,11 +20,12 @@ export function InviteCard(props: {
   peerName: string;
   you: InviteUserStatus;
   them: InviteUserStatus;
+  expired?: boolean;
   onAccept?: () => void;
   onPass?: () => void;
 }) {
-  const closed = props.you === "declined" || props.them === "declined";
-  const booked = props.you === "accepted" && props.them === "accepted";
+  const closed = inviteIsClosed(props.you, props.them) || Boolean(props.expired);
+  const booked = inviteIsBooked(props.you, props.them);
   return (
     <article
       style={{
@@ -51,6 +52,7 @@ export function InviteCard(props: {
         themName={props.peerName}
         you={props.you}
         them={props.them}
+        expired={props.expired}
       />
       {!closed && !booked && props.you === "waiting" ? (
         <div style={{ display: "flex", gap: 12, marginTop: 4 }}>

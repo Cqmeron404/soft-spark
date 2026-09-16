@@ -1,20 +1,12 @@
 import { serve } from "@hono/node-server";
-import { createApp } from "./app.js";
-import { bootstrap } from "./bootstrap.js";
+import { getApp } from "./server.js";
 
 const port = Number(process.env.PORT ?? 8787);
 
-const ctx = await bootstrap();
-const app = createApp({
-  store: ctx.store,
-  auth: ctx.auth,
-  hub: ctx.hub,
-  events: ctx.events,
-  db: ctx.db,
-});
-
-serve({ fetch: app.fetch, port }, () => {
+const started = await getApp();
+serve({ fetch: started.fetch, port }, () => {
+  const flags = started.flags;
   console.log(
-    `soft-spark api listening on http://localhost:${port} (${ctx.kind}${ctx.dataDir ? ` ${ctx.dataDir}` : ""})`
+    `soft-spark api listening on http://localhost:${port} (prod=${flags.production} db=${flags.database} places=${flags.places} llm=${flags.llm} webPush=${flags.webPush})`
   );
 });
