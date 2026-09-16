@@ -56,7 +56,12 @@ export default function SignInPage() {
       <button type="button" className="ss-btn ss-btn-primary" disabled={busy} onClick={() => void submit()}>
         Sign in
       </button>
-      <DemoSignInButtons busy={busy} onBusy={setBusy} onError={(m) => setError(m || null)} then={(path) => router.replace(path)} />
+      <DemoSignInButtons
+        busy={busy}
+        onBusy={setBusy}
+        onError={(m) => setError(m || null)}
+        then={(path) => window.location.assign(path)}
+      />
       <p style={{ margin: 0 }}>
         New here? <Link href="/auth/sign-up">Create your bot</Link>
       </p>

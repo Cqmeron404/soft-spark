@@ -146,7 +146,14 @@ export default function Home() {
           One tap — no email form. Or use a demo account.
         </p>
       </div>
-      <DemoSignInButtons busy={busy} onBusy={setBusy} onError={(m) => setError(m || null)} then={(path) => router.replace(path)} />
+      <DemoSignInButtons
+        busy={busy}
+        onBusy={setBusy}
+        onError={(m) => setError(m || null)}
+        then={(path) => {
+          window.location.assign(path);
+        }}
+      />
       <p style={{ margin: 0 }}>
         <Link href="/auth/sign-in">Already have an account? Sign in</Link>
       </p>

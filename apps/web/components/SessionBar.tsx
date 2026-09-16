@@ -50,11 +50,14 @@ export function SessionBar() {
             <button
               type="button"
               className="ss-btn ss-btn-ghost"
-              style={{ minHeight: 32, padding: "0 10px", fontSize: 13 }}
+              style={{ minHeight: 44, padding: "0 12px", fontSize: 13 }}
               onClick={async () => {
-                await signOut();
-                clearSession();
-                window.location.href = "/auth/sign-in";
+                try {
+                  await signOut();
+                } finally {
+                  clearSession();
+                  window.location.assign("/auth/sign-in");
+                }
               }}
             >
               Sign out
