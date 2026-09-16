@@ -30,3 +30,20 @@ export function inviteIsClosed(you: InviteUserStatus, them: InviteUserStatus): b
 export function inviteIsBooked(you: InviteUserStatus, them: InviteUserStatus): boolean {
   return you === "accepted" && them === "accepted";
 }
+
+export const CARRY_CUE_MAX = 80;
+
+/** Trim / cap free-text IRL carry cue. Empty → undefined (field stays optional). */
+export function normalizeCarryCue(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.replace(/\s+/g, " ").trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, CARRY_CUE_MAX);
+}
+
+/** Stub search UX — heuristic only; matchEngine is stub. */
+export const BOT_SEARCH_ETA = {
+  minSeconds: 12,
+  maxSeconds: 22,
+  typicalSeconds: 16,
+} as const;

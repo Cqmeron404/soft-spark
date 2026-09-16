@@ -31,22 +31,60 @@
 }
 
 .ss-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 44px;
   border-radius: var(--ss-radius-button);
   padding: 0 18px;
   font: 600 16px/1 var(--ss-font-ui);
   cursor: pointer;
   border: none;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease,
+    background 180ms ease;
+}
+
+.ss-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
 }
 
 .ss-btn-primary {
   background: var(--ss-accent);
   color: var(--ss-text);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ss-accent) 28%, transparent);
+}
+
+.ss-btn-primary:hover:not(:disabled) {
+  transform: scale(1.035);
+  filter: brightness(1.04);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--ss-accent) 22%, transparent),
+    0 8px 22px color-mix(in srgb, var(--ss-accent) 36%, #fff8f2);
+}
+
+.ss-btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+  filter: brightness(0.98);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ss-accent) 30%, transparent);
 }
 
 .ss-btn-ghost {
   background: transparent;
   color: var(--ss-text);
+}
+
+.ss-btn-ghost:hover:not(:disabled) {
+  transform: scale(1.03);
+  background: color-mix(in srgb, var(--ss-accent) 18%, var(--ss-surface));
+}
+
+.ss-btn-ghost:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .ss-btn-danger {
@@ -85,5 +123,51 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes ss-ember-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ss-accent) 0%, transparent);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 28px 10px color-mix(in srgb, var(--ss-accent) 32%, transparent);
+  }
+}
+
+.ss-ember-search {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 38% 32%, var(--ss-accent-soft), var(--ss-accent));
+  animation: ss-ember-pulse 1.8s ease-in-out infinite;
+}
+
+.ss-ember-search img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-btn,
+  .ss-btn-primary,
+  .ss-btn-ghost,
+  .ss-ember-search {
+    transition: none;
+    animation: none;
+  }
+
+  .ss-btn-primary:hover:not(:disabled),
+  .ss-btn-primary:active:not(:disabled),
+  .ss-btn-ghost:hover:not(:disabled),
+  .ss-btn-ghost:active:not(:disabled) {
+    transform: none;
+    filter: none;
   }
 }

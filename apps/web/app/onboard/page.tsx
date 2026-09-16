@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OnboardBody } from "@soft-spark/shared";
 import { PhotoCrop } from "@soft-spark/ui";
+import { BotSearchAction } from "@/components/BotSearchAction";
 import { onboard } from "@/lib/api";
 import { getAuthSession } from "@/lib/auth";
 import { writeSession } from "@/lib/session";
@@ -122,7 +123,6 @@ export default function OnboardPage() {
       const res = await onboard(body);
       writeSession({ id: res.user.id, displayName: res.user.displayName });
       setDone(true);
-      window.setTimeout(() => router.push("/matches"), 1400);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not onboard");
     } finally {
@@ -134,10 +134,14 @@ export default function OnboardPage() {
 
   if (done) {
     return (
-      <div style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "grid", gap: 16 }}>
         <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 32, margin: 0 }}>
           Your bot’s ready. We’ll ping you when chemistry builds
         </h1>
+        <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>
+          Or send it out now — you’ll land on the invite when a match is ready.
+        </p>
+        <BotSearchAction />
       </div>
     );
   }

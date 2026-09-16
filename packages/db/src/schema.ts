@@ -195,6 +195,9 @@ export const invites = pgTable("invites", {
   travelKmA: doublePrecision("travel_km_a").notNull(),
   travelKmB: doublePrecision("travel_km_b").notNull(),
   why: text("why").notNull(),
+  /** IRL find-each-other cue set on accept — never a chat transcript. */
+  carryCueA: text("carry_cue_a"),
+  carryCueB: text("carry_cue_b"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

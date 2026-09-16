@@ -31,6 +31,8 @@ type MatchRes = {
     id: string;
     you?: string;
     them?: string;
+    youCarryCue?: string;
+    themCarryCue?: string;
     venue?: { travelKmYou: number; travelKmThem: number };
   };
 };
@@ -349,12 +351,23 @@ async function main() {
 
   const a1 = await app.request(`/matches/${match.id}/invites/${inviteId}/accept`, {
     method: "POST",
-    headers: { cookie: mayaAuth.cookie },
+    headers: { "content-type": "application/json", cookie: mayaAuth.cookie },
+    body: JSON.stringify({ carryCue: "red tote" }),
   });
   const afterMaya = await json<MatchRes>(a1);
   if (afterMaya.invite?.you !== "accepted" || afterMaya.state !== "invited") {
     failures.push("after Maya accept expected waiting on Jordan");
   } else console.log("ok  Maya accept → waiting on Jordan");
+  if (afterMaya.invite?.youCarryCue !== "red tote") {
+    failures.push(`Maya carry cue missing after accept: ${JSON.stringify(afterMaya.invite)}`);
+  } else console.log("ok  Maya carry cue persisted on accept");
+
+  const jordanSeesCue = await json<MatchRes>(
+    await app.request(`/matches/${match.id}`, { headers: { cookie: jordanAuth.cookie } })
+  );
+  if (jordanSeesCue.invite?.themCarryCue !== "red tote") {
+    failures.push("Jordan should see Maya’s carry cue before accepting");
+  } else console.log("ok  peer can see carry cue on the invite card");
 
   if (!seenRealtime.includes("invite.accepted")) {
     failures.push("peer did not receive invite.accepted realtime event");
@@ -364,11 +377,22 @@ async function main() {
 
   const a2 = await app.request(`/matches/${match.id}/invites/${inviteId}/accept`, {
     method: "POST",
-    headers: { cookie: jordanAuth.cookie },
+    headers: { "content-type": "application/json", cookie: jordanAuth.cookie },
+    body: JSON.stringify({ carryCue: "blue jacket" }),
   });
   const booked = await json<MatchRes>(a2);
   if (booked.state !== "booked") failures.push(`expected booked, got ${booked.state}`);
   else console.log("ok  dual accept → booked");
+  if (booked.invite?.youCarryCue !== "blue jacket" || booked.invite?.themCarryCue !== "red tote") {
+    failures.push(`Jordan booked invite missing both carry cues: ${JSON.stringify(booked.invite)}`);
+  } else console.log("ok  both carry cues visible after dual accept");
+
+  const mayaBooked = await json<MatchRes>(
+    await app.request(`/matches/${match.id}`, { headers: { cookie: mayaAuth.cookie } })
+  );
+  if (mayaBooked.invite?.youCarryCue !== "red tote" || mayaBooked.invite?.themCarryCue !== "blue jacket") {
+    failures.push("Maya should see both carry cues after booking");
+  } else console.log("ok  Maya sees both IRL carry cues (no transcript)");
 
   const a3 = await app.request(`/matches/${match.id}/invites/${inviteId}/accept`, {
     method: "POST",
@@ -381,6 +405,54 @@ async function main() {
   if (!ctx.events.types().includes(EVENTS.INVITE_ACCEPTED) || !ctx.events.types().includes(EVENTS.INVITE_BOOKED)) {
     failures.push("missing invite.accepted / invite.booked");
   }
+
+  const unauthSearch = await app.request("/matches/search", { method: "POST", body: "{}" });
+  if (unauthSearch.status !== 401) {
+    failures.push(`POST /matches/search unauth expected 401, got ${unauthSearch.status}`);
+  } else console.log("ok  POST /matches/search requires a session");
+
+  const mayaSearch = await json<{
+    found?: boolean;
+    estimatedSeconds?: number;
+    match?: { id: string; state: string; confidence?: number };
+  }>(
+    await app.request("/matches/search", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: mayaAuth.cookie },
+      body: "{}",
+    })
+  );
+  const searchRaw = JSON.stringify(mayaSearch);
+  if (searchRaw.includes('"confidence"') || searchRaw.includes("transcript") || /"messages"\s*:/.test(searchRaw)) {
+    failures.push("POST /matches/search leaked confidence, transcript, or messages[]");
+  }
+  if (!mayaSearch.found || mayaSearch.match?.id !== match.id || typeof mayaSearch.estimatedSeconds !== "number") {
+    failures.push(`POST /matches/search should return Maya’s existing match + ETA, got ${searchRaw}`);
+  } else console.log(`ok  POST /matches/search → existing ${mayaSearch.match?.state} + ETA ${mayaSearch.estimatedSeconds}s`);
+
+  const samAuth = await signUp(app, {
+    email: "sam@softspark.dev",
+    password: "spark-demo-sam",
+    name: "Sam",
+  });
+  const samOnboard = await app.request("/users/me/onboard", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: samAuth.cookie },
+    body: JSON.stringify({ ...JORDAN, profile: { ...JORDAN.profile, displayName: "Sam" } }),
+  });
+  if (samOnboard.status >= 400) {
+    failures.push(`Sam onboard for search failed ${samOnboard.status}`);
+  }
+  const samSearch = await json<{ found?: boolean; match?: { id: string; state: string } }>(
+    await app.request("/matches/search", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: samAuth.cookie },
+      body: "{}",
+    })
+  );
+  if (!samSearch.found || !samSearch.match?.id) {
+    failures.push(`POST /matches/search should create/find a stub match for a new user, got ${JSON.stringify(samSearch)}`);
+  } else console.log(`ok  POST /matches/search new user → ${samSearch.match.state}`);
 
   const pause = await app.request("/users/me/bot", {
     method: "PATCH",

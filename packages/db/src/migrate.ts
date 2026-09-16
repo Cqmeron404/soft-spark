@@ -143,6 +143,8 @@ const STATEMENTS = [
     travel_km_a DOUBLE PRECISION NOT NULL,
     travel_km_b DOUBLE PRECISION NOT NULL,
     why TEXT NOT NULL,
+    carry_cue_a TEXT,
+    carry_cue_b TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
   `CREATE TABLE IF NOT EXISTS "push_devices" (
@@ -157,8 +159,22 @@ const STATEMENTS = [
   )`,
 ];
 
+/** Additive columns for existing Hobby / PGlite databases (CREATE TABLE IF NOT EXISTS will not alter). */
+const ALTERS = [
+  `ALTER TABLE "invites" ADD COLUMN IF NOT EXISTS carry_cue_a TEXT`,
+  `ALTER TABLE "invites" ADD COLUMN IF NOT EXISTS carry_cue_b TEXT`,
+];
+
 export async function applySchema(db: SparkDb): Promise<void> {
   for (const statement of STATEMENTS) {
     await db.execute(sql.raw(statement));
+  }
+  for (const statement of ALTERS) {
+    try {
+      await db.execute(sql.raw(statement));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`soft-spark-db: schema alter skipped (${message})`);
+    }
   }
 }

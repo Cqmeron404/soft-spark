@@ -23,7 +23,15 @@ import {
   type VenueSuggester,
   type ChemistryDims,
 } from "@soft-spark/match-engine";
-import { EVENTS, isClientPushType, isHomeCardReason, type ClientRealtimeEvent } from "@soft-spark/shared";
+import {
+  BOT_SEARCH_ETA,
+  EVENTS,
+  isClientPushType,
+  isHomeCardReason,
+  normalizeCarryCue,
+  type ClientRealtimeEvent,
+  type MatchState,
+} from "@soft-spark/shared";
 import type { EventLog } from "./event-log.js";
 import { assertPlacesInProd } from "./env.js";
 import type { PushDispatcher } from "./push.js";
@@ -372,6 +380,54 @@ export async function orchestrateMatch(input: {
   return (await store.getMatch(match.id))!;
 }
 
+const LIVE_MATCH_STATES = new Set<MatchState>(["exploring", "invite_ready", "invited", "booked"]);
+
+export async function searchMatchForUser(input: {
+  store: SparkStore;
+  events: EventLog;
+  userId: string;
+  hub?: RealtimeHub;
+  push?: PushDispatcher;
+}): Promise<{ match?: MatchRecord; estimatedSeconds: number }> {
+  const estimatedSeconds = BOT_SEARCH_ETA.typicalSeconds;
+  const live = (await input.store.matchesForUser(input.userId)).find((m) =>
+    LIVE_MATCH_STATES.has(m.state)
+  );
+  if (live) return { match: live, estimatedSeconds };
+
+  const a = await snapshotFor(input.store, input.userId);
+  let partnerId: string | undefined;
+  for (const otherId of await input.store.listOtherUserIds(input.userId)) {
+    const pair = await input.store.existingPair(input.userId, otherId);
+    if (pair && LIVE_MATCH_STATES.has(pair.state)) {
+      return { match: pair, estimatedSeconds };
+    }
+    if (pair && (pair.state === "declined" || pair.state === "archived")) continue;
+    try {
+      const b = await snapshotFor(input.store, otherId);
+      if (passesHardFilter(a, b)) {
+        partnerId = otherId;
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+  if (!partnerId) return { estimatedSeconds };
+
+  const engine = await createEngine(input.store);
+  const match = await orchestrateMatch({
+    store: input.store,
+    events: input.events,
+    hub: input.hub,
+    push: input.push,
+    engine,
+    userAId: input.userId,
+    userBId: partnerId,
+  });
+  return { match, estimatedSeconds };
+}
+
 export async function respondInvite(input: {
   store: SparkStore;
   events: EventLog;
@@ -379,6 +435,7 @@ export async function respondInvite(input: {
   inviteId: string;
   userId: string;
   action: "accept" | "decline";
+  carryCue?: string;
   hub?: RealtimeHub;
   push?: PushDispatcher;
 }): Promise<{ match: MatchRecord }> {
@@ -392,12 +449,19 @@ export async function respondInvite(input: {
   }
   const isA = match.userAId === input.userId;
   const mine = isA ? invite.userAStatus : invite.userBStatus;
+  const carryCue = normalizeCarryCue(input.carryCue);
+  const carryPatch = carryCue
+    ? isA
+      ? { carryCueA: carryCue }
+      : { carryCueB: carryCue }
+    : {};
 
   if (input.action === "accept") {
     if (match.state === "declined" || invite.status === "declined") {
       throw Object.assign(new Error("invite_closed"), { status: 409 });
     }
     if (mine === "accepted" && (match.state === "booked" || match.state === "invited")) {
+      if (carryCue) await input.store.updateInvite(invite.id, carryPatch);
       return { match };
     }
     const userAStatus = isA ? "accepted" : invite.userAStatus;
@@ -411,6 +475,7 @@ export async function respondInvite(input: {
         userAStatus,
         userBStatus,
         status: "booked",
+        ...carryPatch,
       });
       input.events.emit(EVENTS.INVITE_BOOKED, {
         matchId: match.id,
@@ -420,7 +485,7 @@ export async function respondInvite(input: {
       await publishClient(input.store, input.hub, "invite.booked", match.id, input.push);
       return { match: booked };
     }
-    await input.store.updateInvite(invite.id, { userAStatus, userBStatus });
+    await input.store.updateInvite(invite.id, { userAStatus, userBStatus, ...carryPatch });
     await publishClient(input.store, input.hub, "invite.accepted", match.id, input.push);
     return { match: (await input.store.getMatch(match.id))! };
   }

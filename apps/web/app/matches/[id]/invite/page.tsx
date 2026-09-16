@@ -13,6 +13,7 @@ export default function InvitePage() {
   const router = useRouter();
   const [match, setMatch] = useState<MatchDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [carryCue, setCarryCue] = useState("");
 
   async function load() {
     const session = readSession();
@@ -52,10 +53,14 @@ export default function InvitePage() {
         peerName={match.peer?.displayName ?? "Them"}
         you={match.invite.you}
         them={match.invite.them}
+        youCarryCue={match.invite.youCarryCue}
+        themCarryCue={match.invite.themCarryCue}
+        carryCueDraft={carryCue}
+        onCarryCueChange={setCarryCue}
         expired={Boolean(match.invite.window.end && Date.parse(match.invite.window.end) < Date.now())}
         onAccept={async () => {
           try {
-            setMatch(await acceptInvite(match.id, match.invite!.id));
+            setMatch(await acceptInvite(match.id, match.invite!.id, carryCue));
           } catch (err) {
             setError(err instanceof Error ? err.message : "Accept failed");
           }

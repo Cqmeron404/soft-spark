@@ -1,4 +1,4 @@
-import type { MatchDetail, MatchListItem, OnboardBody, UserDto } from "@soft-spark/shared";
+import type { MatchDetail, MatchListItem, MatchSearchResult, OnboardBody, UserDto } from "@soft-spark/shared";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
@@ -44,18 +44,22 @@ export function getMatch(id: string) {
   return api<MatchDetail>(`/matches/${id}`);
 }
 
-export function acceptInvite(matchId: string, inviteId: string) {
-  return api<MatchDetail>(`/matches/${matchId}/invites/${inviteId}/accept`, { method: "POST" });
+export function acceptInvite(matchId: string, inviteId: string, carryCue?: string) {
+  return api<MatchDetail>(`/matches/${matchId}/invites/${inviteId}/accept`, {
+    method: "POST",
+    body: JSON.stringify(carryCue ? { carryCue } : {}),
+  });
 }
 
 export function declineInvite(matchId: string, inviteId: string) {
   return api<MatchDetail>(`/matches/${matchId}/invites/${inviteId}/decline`, { method: "POST" });
 }
 
-export function orchestrate(userAId?: string, userBId?: string) {
-  return api<{ matchId: string; state: string; band: string }>("/internal/orchestrate", {
+/** Authenticated stub search. Do not call /internal/orchestrate from the browser. */
+export function searchForDate() {
+  return api<MatchSearchResult>("/matches/search", {
     method: "POST",
-    body: JSON.stringify({ userAId, userBId }),
+    body: "{}",
   });
 }
 

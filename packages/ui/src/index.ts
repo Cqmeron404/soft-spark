@@ -8,3 +8,5 @@ export { InviteCard, priceLabel } from "./InviteCard";
 export { DualStatusRow } from "./DualStatusRow";
 export { RevealSheet } from "./RevealSheet";
 export { ConnectingCaption, SoftToast, PhotoCrop, EmptyState, SoftError } from "./chrome";
+export { BotSearchCard, searchLineForElapsed } from "./BotSearchCard";
+export type { BotSearchPhase } from "./BotSearchCard";

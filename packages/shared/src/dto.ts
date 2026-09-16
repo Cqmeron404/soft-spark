@@ -37,6 +37,10 @@ export type InviteSummary = {
   window: InviteWindow;
   you: InviteUserStatus;
   them: InviteUserStatus;
+  /** IRL identify cue the viewer set on accept. */
+  youCarryCue?: string;
+  /** IRL identify cue the peer set on accept. */
+  themCarryCue?: string;
 };
 
 export type MatchListItem = {
@@ -51,6 +55,14 @@ export type MatchListItem = {
 
 export type MatchDetail = MatchListItem & {
   invite?: InviteSummary;
+};
+
+/** Authenticated stub search — never requires INTERNAL_JOB_SECRET. */
+export type MatchSearchResult = {
+  found: boolean;
+  estimatedSeconds: number;
+  match?: MatchDetail;
+  message?: string;
 };
 
 export type BotDto = {

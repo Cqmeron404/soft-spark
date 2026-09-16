@@ -21,6 +21,10 @@ export function InviteCard(props: {
   you: InviteUserStatus;
   them: InviteUserStatus;
   expired?: boolean;
+  youCarryCue?: string;
+  themCarryCue?: string;
+  carryCueDraft?: string;
+  onCarryCueChange?: (value: string) => void;
   onAccept?: () => void;
   onPass?: () => void;
 }) {
@@ -48,6 +52,56 @@ export function InviteCard(props: {
         {formatMilesFromKm(props.travelKmYou)} mi from you · {formatMilesFromKm(props.travelKmThem)} mi from them
       </p>
       <p style={{ margin: 0, fontSize: 14 }}>{props.windowLabel}</p>
+      {props.you === "waiting" && props.onCarryCueChange ? (
+        <label style={{ display: "grid", gap: 6 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>What I’ll be carrying</span>
+          <input
+            value={props.carryCueDraft ?? ""}
+            onChange={(e) => props.onCarryCueChange?.(e.target.value)}
+            maxLength={80}
+            placeholder="red tote, blue jacket…"
+            style={{
+              minHeight: 44,
+              border: `1px solid ${tokens.border}`,
+              borderRadius: tokens.radiusButton,
+              padding: "0 12px",
+              background: tokens.surfaceElevated,
+              color: tokens.text,
+            }}
+          />
+          <span style={{ color: tokens.textMuted, fontSize: 13 }}>
+            A small cue so you can find each other — not a chat
+          </span>
+        </label>
+      ) : null}
+      {props.youCarryCue || props.themCarryCue ? (
+        <div
+          style={{
+            display: "grid",
+            gap: 6,
+            padding: 12,
+            borderRadius: 14,
+            background: tokens.surfaceElevated,
+            border: `1px solid ${tokens.border}`,
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 13, color: tokens.textMuted, fontWeight: 600 }}>
+            How you’ll find each other
+          </p>
+          {props.youCarryCue ? (
+            <p style={{ margin: 0, fontSize: 14 }}>You’ll be carrying: {props.youCarryCue}</p>
+          ) : null}
+          {props.themCarryCue ? (
+            <p style={{ margin: 0, fontSize: 14 }}>
+              {props.peerName} will be carrying: {props.themCarryCue}
+            </p>
+          ) : (
+            <p style={{ margin: 0, fontSize: 13, color: tokens.textMuted }}>
+              Waiting on {props.peerName}’s carry cue
+            </p>
+          )}
+        </div>
+      ) : null}
       <DualStatusRow
         themName={props.peerName}
         you={props.you}
