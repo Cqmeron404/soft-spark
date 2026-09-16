@@ -31,6 +31,7 @@ export type EnvFlagReport = {
   llm: boolean;
   webPush: boolean;
   expoPush: boolean;
+  demoUsers: boolean;
 };
 
 export function envFlags(env: NodeJS.ProcessEnv = process.env): EnvFlagReport {
@@ -44,6 +45,7 @@ export function envFlags(env: NodeJS.ProcessEnv = process.env): EnvFlagReport {
     llm: env.MATCH_ENGINE_MODE === "llm" && Boolean(env.OPENAI_API_KEY),
     webPush: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY),
     expoPush: true,
+    demoUsers: allowDemoUsers(env),
   };
 }
 
@@ -59,6 +61,7 @@ export type HealthPayload = {
     places: boolean;
     llm: boolean;
     webPush: boolean;
+    demoUsers: boolean;
   };
   bootMissing?: string[];
 };
@@ -78,6 +81,7 @@ export function healthPayload(env: NodeJS.ProcessEnv = process.env): HealthPaylo
       places: flags.places,
       llm: flags.llm,
       webPush: flags.webPush,
+      demoUsers: flags.demoUsers,
     },
   };
 }
@@ -119,6 +123,16 @@ export function assertPlacesInProd(
 export function allowVenueCatalogSeed(env: NodeJS.ProcessEnv = process.env): boolean {
   if (!isProduction(env)) return true;
   return isForcedSeedVenueMode(env);
+}
+
+/**
+ * Maya/Jordan one-tap accounts. On in production unless ALLOW_DEMO_USERS=0.
+ * Local soak still signs up its own users unless ALLOW_DEMO_USERS=1.
+ */
+export function allowDemoUsers(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.ALLOW_DEMO_USERS === "0") return false;
+  if (env.ALLOW_DEMO_USERS === "1") return true;
+  return isProduction(env);
 }
 
 export const GO_LIVE_SECRETS = [

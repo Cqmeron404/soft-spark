@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# HTTP demo: Better Auth → two users → booked. Requires API at $API_URL (default localhost:8787).
+# HTTP demo against a running API. Uses maya-http@ / jordan-http@ so it does not
+# collide with the public UI demo accounts (maya@ / jordan@ from DEMO_ACCOUNTS).
 set -euo pipefail
 API="${API_URL:-http://localhost:8787}"
 

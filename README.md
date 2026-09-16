@@ -60,6 +60,8 @@ Live deploy needs **host secrets**. This repo does **not** invent credentials. W
 
 **Boot (`NODE_ENV=production`)** refuses to start without `DATABASE_URL` (`postgres://…`) and `BETTER_AUTH_SECRET` (not the dev default). Missing Google Places does **not** fail boot when `ALLOW_VENUE_SEED=1` or `VENUE_MODE=seed`. `/health` reports `venues` as `seed` | `places` plus boolean env flags (no secret values).
 
+**Demo one-tap accounts:** production API boot idempotently ensures `maya@softspark.dev` / `jordan@softspark.dev` (passwords match the web buttons in `@soft-spark/shared` `DEMO_ACCOUNTS`) and onboards the Denver personas so sign-in lands on matches, not `Invalid email or password`. Disable with `ALLOW_DEMO_USERS=0`. Local `pnpm demo` still signs up its own users unless `ALLOW_DEMO_USERS=1`.
+
 ### Prod go-live secrets (exact)
 
 Required (Phase 1 auth/DB — Vercel **API** project):
@@ -121,6 +123,7 @@ pnpm --filter @soft-spark/db exec drizzle-kit push
 | `GOOGLE_PLACES_API_KEY` | prod Places | Nearby search when seed is **not** forced. 0 results → `exploring` + `match.venue_unavailable`. |
 | `ALLOW_VENUE_SEED` | $0 venues | `1` allows Denver catalog seed **and** catalog VenueSuggester in production (no Places key). |
 | `VENUE_MODE` | $0 venues | `seed` same as `ALLOW_VENUE_SEED=1`. Forced seed wins over a present Places key. Unset + key → `places`. |
+| `ALLOW_DEMO_USERS` | demo buttons | Production **on** by default (Maya/Jordan Better Auth + onboard on API boot). `0` disables. `1` enables locally. |
 | `MATCH_ENGINE_MODE` | always | `stub` (default / **rollback**) or `llm`. Stub never calls OpenAI even if a key is set. Mode=`llm` without `OPENAI_API_KEY` forces stub + log. |
 | `OPENAI_API_KEY` | llm | Chat Completions for `ConversationRunner` + optional chemistry judge. |
 | `OPENAI_BASE_URL` / `OPENAI_MODEL` | no | OpenAI-compatible override. |
@@ -140,7 +143,7 @@ Protected routes (`/users/me/*`, `/matches*`, `/realtime/*`) require a Better Au
 
 | Method | Path | Notes |
 |--------|------|--------|
-| GET | `/health` | `{ ok, venues: "seed"\|"places", matchEngine, env: { database, authSecret, places, llm, webPush } }` — no secrets |
+| GET | `/health` | `{ ok, venues: "seed"\|"places", matchEngine, env: { database, authSecret, places, llm, webPush, demoUsers } }` — no secrets |
 | GET | `/push/vapid-public` | `{ configured, publicKey }` for web push subscribe |
 | POST/GET | `/auth/*` | Better Auth |
 | POST | `/users/me/onboard` | Session required. `botDatingOptIn: true` else **400**. Optional `photoUrl` |
@@ -153,6 +156,7 @@ Protected routes (`/users/me/*`, `/matches*`, `/realtime/*`) require a Better Au
 | POST | `/matches/:id/invites/:inviteId/accept` | Idempotent; both accept → `booked` |
 | POST | `/matches/:id/invites/:inviteId/decline` | Idempotent; either decline → `declined` |
 | GET | `/realtime/stream` | SSE: band + DualStatusRow events. No transcripts |
+| POST | `/internal/ensure-demo-users` | Idempotent Maya/Jordan seed when `allowDemoUsers()`; **404** if disabled |
 | POST | `/internal/orchestrate` | Demo job: `{ userAId, userBId, emptyVenues? }` |
 | GET | `/internal/events` | Forge event log |
 

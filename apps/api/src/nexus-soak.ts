@@ -3,7 +3,7 @@
  * Live OpenAI completions run only when MATCH_ENGINE_MODE=llm and OPENAI_API_KEY is set.
  * Do not invent API keys.
  */
-import { EVENTS, isHomeCardReason, type LookingFor, type OnboardBody } from "@soft-spark/shared";
+import { EVENTS, isHomeCardReason, DEMO_ONBOARD, type LookingFor, type OnboardBody } from "@soft-spark/shared";
 import {
   HAPPY_PATH_DIMS,
   resolveMatchEngineMode,
@@ -18,47 +18,8 @@ import type { SparkStore } from "./store.js";
 type App = ReturnType<typeof createApp>;
 type OnboardRes = { user: { id: string; displayName: string }; bot: { id: string } };
 
-const MAYA: OnboardBody = {
-  botDatingOptIn: true,
-  profile: {
-    displayName: "Maya",
-    age: 29,
-    gender: "woman",
-    interestedIn: ["man"],
-  },
-  prefs: {
-    cuisine: ["italian", "american"],
-    budget: 3,
-    maxTravelKm: 25,
-    dealbreakers: [],
-    lookingFor: "relationship",
-    interests: ["food", "hiking", "live music"],
-  },
-  homeGeo: { lat: 39.739, lng: -104.979 },
-  homeTz: "America/Denver",
-  vibeTags: ["Curious", "Soft"],
-};
-
-const JORDAN: OnboardBody = {
-  botDatingOptIn: true,
-  profile: {
-    displayName: "Jordan",
-    age: 31,
-    gender: "man",
-    interestedIn: ["woman"],
-  },
-  prefs: {
-    cuisine: ["italian", "american"],
-    budget: 3,
-    maxTravelKm: 20,
-    dealbreakers: [],
-    lookingFor: "relationship",
-    interests: ["food", "hiking", "design"],
-  },
-  homeGeo: { lat: 39.759, lng: -104.999 },
-  homeTz: "America/Denver",
-  vibeTags: ["Curious", "Witty"],
-};
+const MAYA: OnboardBody = DEMO_ONBOARD.maya;
+const JORDAN: OnboardBody = DEMO_ONBOARD.jordan;
 
 const SNAKE = /^[a-z]+(_[a-z0-9]+)*$/;
 

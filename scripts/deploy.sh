@@ -29,6 +29,7 @@ case "$cmd" in
       if [ -z "${!v:-}" ]; then echo "MISSING  $v (web)"; missing=1; else echo "set      $v"; fi
     done
     echo "optional MATCH_ENGINE_MODE=${MATCH_ENGINE_MODE:-stub}"
+    echo "optional ALLOW_DEMO_USERS=${ALLOW_DEMO_USERS:-prod-default-on} (0 disables Maya/Jordan seed)"
     if [ "${ALLOW_VENUE_SEED:-}" = "1" ] || [ "${VENUE_MODE:-}" = "seed" ]; then
       echo "venues   seed (ALLOW_VENUE_SEED=${ALLOW_VENUE_SEED:-} VENUE_MODE=${VENUE_MODE:-})"
     elif [ -n "${GOOGLE_PLACES_API_KEY:-}" ]; then

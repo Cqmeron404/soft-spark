@@ -1,60 +1,19 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EVENTS, dualStatusSummary, formatMilesFromKm } from "@soft-spark/shared";
+import { DEMO_ACCOUNTS, DEMO_ONBOARD, EVENTS, dualStatusSummary, formatMilesFromKm } from "@soft-spark/shared";
 import { PGlite } from "@soft-spark/db";
 import { runInviteThresholdRegression } from "@soft-spark/match-engine";
 import { createApp } from "./app.js";
 import { bootstrap } from "./bootstrap.js";
 import { webOrigins } from "./cors.js";
-import { bootMissing, placesMissing } from "./env.js";
+import { allowDemoUsers, bootMissing, placesMissing } from "./env.js";
+import { ensureDemoUsers } from "./ensure-demo-users.js";
 import { runNexusSoakScenarios } from "./nexus-soak.js";
 import { createEngine, orchestrateMatch } from "./orchestrate.js";
 
-const MAYA = {
-  botDatingOptIn: true,
-  profile: {
-    displayName: "Maya",
-    age: 29,
-    gender: "woman",
-    interestedIn: ["man"],
-    bio: "Denver nights, italian food",
-  },
-  prefs: {
-    cuisine: ["italian", "american"],
-    budget: 3 as const,
-    maxTravelKm: 25,
-    dealbreakers: [],
-    lookingFor: "relationship",
-    interests: ["food", "hiking", "live music"],
-  },
-  homeGeo: { lat: 39.739, lng: -104.979 },
-  homeTz: "America/Denver",
-  vibeTags: ["Curious", "Soft"],
-  photoUrl: "https://cdn.softspark.dev/maya.jpg",
-};
-
-const JORDAN = {
-  botDatingOptIn: true,
-  profile: {
-    displayName: "Jordan",
-    age: 31,
-    gender: "man",
-    interestedIn: ["woman"],
-    bio: "LoHi, long walks, pasta",
-  },
-  prefs: {
-    cuisine: ["italian", "american"],
-    budget: 3 as const,
-    maxTravelKm: 20,
-    dealbreakers: [],
-    lookingFor: "relationship",
-    interests: ["food", "hiking", "design"],
-  },
-  homeGeo: { lat: 39.759, lng: -104.999 },
-  homeTz: "America/Denver",
-  vibeTags: ["Curious", "Witty"],
-};
+const MAYA = DEMO_ONBOARD.maya;
+const JORDAN = DEMO_ONBOARD.jordan;
 
 type OnboardRes = { user: { id: string; displayName: string }; bot: { id: string } };
 type MatchRes = {
@@ -113,7 +72,20 @@ async function main() {
     failures.push("prod boot must not fail solely for missing Places when seed mode is on");
   } else console.log("ok  prod boot does not require Places in seed mode");
 
-  const ctx = await bootstrap({ pglite: new PGlite() });
+  if (allowDemoUsers({ NODE_ENV: "production" } as NodeJS.ProcessEnv) !== true) {
+    failures.push("prod should ensure Maya/Jordan demo users by default");
+  } else console.log("ok  prod ensures demo users unless ALLOW_DEMO_USERS=0");
+  if (allowDemoUsers({ NODE_ENV: "production", ALLOW_DEMO_USERS: "0" } as NodeJS.ProcessEnv)) {
+    failures.push("ALLOW_DEMO_USERS=0 should disable demo ensure in prod");
+  } else console.log("ok  ALLOW_DEMO_USERS=0 disables demo ensure");
+  if (allowDemoUsers({} as NodeJS.ProcessEnv)) {
+    failures.push("local default should not auto-ensure (soak still signs up Maya/Jordan)");
+  } else console.log("ok  local soak does not auto-ensure demo users");
+  if (!allowDemoUsers({ ALLOW_DEMO_USERS: "1" } as NodeJS.ProcessEnv)) {
+    failures.push("ALLOW_DEMO_USERS=1 should enable local demo ensure");
+  } else console.log("ok  ALLOW_DEMO_USERS=1 enables local demo ensure");
+
+  const ctx = await bootstrap({ pglite: new PGlite(), seedDemoUsers: false });
   const app = createApp(ctx);
 
   process.env.WEB_ORIGIN ??= "http://localhost:3000";
@@ -159,17 +131,17 @@ async function main() {
   else console.log("ok  onboard without session → 401");
 
   const mayaAuth = await signUp(app, {
-    email: "maya@softspark.dev",
-    password: "spark-demo-maya",
-    name: "Maya",
+    email: DEMO_ACCOUNTS.maya.email,
+    password: DEMO_ACCOUNTS.maya.password,
+    name: DEMO_ACCOUNTS.maya.name,
   });
   if (mayaAuth.res.status >= 400) {
     failures.push(`maya sign-up failed ${mayaAuth.res.status} ${await mayaAuth.res.text()}`);
   }
   const jordanAuth = await signUp(app, {
-    email: "jordan@softspark.dev",
-    password: "spark-demo-jordan",
-    name: "Jordan",
+    email: DEMO_ACCOUNTS.jordan.email,
+    password: DEMO_ACCOUNTS.jordan.password,
+    name: DEMO_ACCOUNTS.jordan.name,
   });
   if (jordanAuth.res.status >= 400) {
     failures.push(`jordan sign-up failed ${jordanAuth.res.status} ${await jordanAuth.res.text()}`);
@@ -209,6 +181,85 @@ async function main() {
   );
   if (mayaProfile.photoUrl !== MAYA.photoUrl) failures.push("onboard did not persist photoUrl");
   else console.log("ok  onboard Maya + Jordan (User + DatingBot + photoUrl)");
+
+  {
+    const seeded = await bootstrap({ pglite: new PGlite(), seedDemoUsers: true });
+    const seededApp = createApp(seeded);
+    const mayaIn = await seededApp.request("/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: DEMO_ACCOUNTS.maya.email, password: DEMO_ACCOUNTS.maya.password }),
+    });
+    if (mayaIn.status >= 400) {
+      failures.push(`seeded Maya sign-in failed ${mayaIn.status} ${await mayaIn.text()}`);
+    }
+    const mayaCookie = cookiesFrom(mayaIn);
+    const seededMaya = await json<{ displayName?: string; photoUrl?: string }>(
+      await seededApp.request("/users/me", { headers: { cookie: mayaCookie } })
+    );
+    if (seededMaya.displayName !== "Maya" || seededMaya.photoUrl !== MAYA.photoUrl) {
+      failures.push("seeded Maya sign-in should land onboarded with photoUrl");
+    } else console.log("ok  ensure-demo-users: Maya sign-in (no prior sign-up)");
+
+    const jordanIn = await seededApp.request("/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: DEMO_ACCOUNTS.jordan.email,
+        password: DEMO_ACCOUNTS.jordan.password,
+      }),
+    });
+    if (jordanIn.status >= 400) {
+      failures.push(`seeded Jordan sign-in failed ${jordanIn.status} ${await jordanIn.text()}`);
+    }
+    const seededJordan = await json<{ displayName?: string }>(
+      await seededApp.request("/users/me", { headers: { cookie: cookiesFrom(jordanIn) } })
+    );
+    if (seededJordan.displayName !== "Jordan") {
+      failures.push("seeded Jordan sign-in should land onboarded");
+    } else console.log("ok  ensure-demo-users: Jordan sign-in (no prior sign-up)");
+
+    const again = await ensureDemoUsers(seeded);
+    if (again.users.length !== 2 || again.users.some((u) => u.createdAuth)) {
+      failures.push("second ensure-demo-users should be idempotent");
+    } else console.log("ok  ensure-demo-users is idempotent");
+
+    const seededMatches = await json<{ id: string; state: string }[]>(
+      await seededApp.request("/matches", { headers: { cookie: mayaCookie } })
+    );
+    if (!seededMatches[0]) {
+      failures.push("seeded Maya should land on a demo match, not an empty list");
+    } else console.log(`ok  ensure-demo-users match state=${seededMatches[0].state}`);
+
+    const gated = await seededApp.request("/internal/ensure-demo-users", { method: "POST" });
+    if (gated.status !== 404) {
+      failures.push(`ensure endpoint without ALLOW_DEMO_USERS expected 404, got ${gated.status}`);
+    } else console.log("ok  POST /internal/ensure-demo-users → 404 unless allowed");
+    await seeded.close();
+  }
+
+  {
+    const drift = await bootstrap({ pglite: new PGlite(), seedDemoUsers: false });
+    const driftApp = createApp(drift);
+    const wrong = await signUp(driftApp, {
+      email: DEMO_ACCOUNTS.maya.email,
+      password: "not-the-ui-password",
+      name: DEMO_ACCOUNTS.maya.name,
+    });
+    if (wrong.res.status >= 400) {
+      failures.push(`drift Maya sign-up failed ${wrong.res.status} ${await wrong.res.text()}`);
+    }
+    await ensureDemoUsers(drift);
+    const fixed = await driftApp.request("/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: DEMO_ACCOUNTS.maya.email, password: DEMO_ACCOUNTS.maya.password }),
+    });
+    if (fixed.status >= 400) {
+      failures.push(`demo password realign failed ${fixed.status} ${await fixed.text()}`);
+    } else console.log("ok  ensure-demo-users realigns Maya password to the UI button");
+    await drift.close();
+  }
 
   ctx.events.clear();
   const engine = await createEngine(ctx.store);
@@ -424,9 +475,10 @@ async function main() {
   const health = await json<{
     venues?: string;
     matchEngine?: string;
-    env?: { database?: boolean; places?: boolean };
+    env?: { database?: boolean; places?: boolean; demoUsers?: boolean };
   }>(await app.request("/health"));
   if (!health.env) failures.push("health missing env flags");
+  if (typeof health.env?.demoUsers !== "boolean") failures.push("health missing env.demoUsers flag");
   if (health.venues !== "seed" && health.venues !== "places") {
     failures.push(`health venues mode should be seed|places, got ${health.venues}`);
   }
@@ -448,7 +500,7 @@ async function main() {
 
   const dataDir = await mkdtemp(join(tmpdir(), "soft-spark-"));
   try {
-    const first = await bootstrap({ dataDir });
+    const first = await bootstrap({ dataDir, seedDemoUsers: false });
     const app1 = createApp(first);
     const persistAuth = await signUp(app1, {
       email: "persist@softspark.dev",
@@ -463,7 +515,7 @@ async function main() {
     const persistUser = await json<OnboardRes>(persistOnboard);
     await first.close();
 
-    const second = await bootstrap({ dataDir });
+    const second = await bootstrap({ dataDir, seedDemoUsers: false });
     const app2 = createApp(second);
     const signIn = await app2.request("/auth/sign-in/email", {
       method: "POST",

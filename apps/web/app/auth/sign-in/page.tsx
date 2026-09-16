@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { DEMO_ACCOUNTS, type DemoAccount } from "@soft-spark/shared";
 import { AppLogo, SoftError } from "@soft-spark/ui";
 import { getMe } from "@/lib/api";
 import { signInEmail } from "@/lib/auth";
@@ -15,11 +16,11 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submit() {
+  async function submitWith(nextEmail: string, nextPassword: string) {
     setError(null);
     setBusy(true);
     try {
-      await signInEmail({ email, password });
+      await signInEmail({ email: nextEmail, password: nextPassword });
       try {
         const me = await getMe();
         writeSession({ id: me.id, displayName: me.displayName });
@@ -32,6 +33,12 @@ export default function SignInPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function fillDemo(account: DemoAccount) {
+    setEmail(account.email);
+    setPassword(account.password);
+    void submitWith(account.email, account.password);
   }
 
   return (
@@ -52,30 +59,26 @@ export default function SignInPage() {
         />
       </label>
       {error ? <SoftError>{error}</SoftError> : null}
-      <button type="button" className="ss-btn ss-btn-primary" disabled={busy} onClick={() => void submit()}>
+      <button
+        type="button"
+        className="ss-btn ss-btn-primary"
+        disabled={busy}
+        onClick={() => void submitWith(email, password)}
+      >
         Sign in
       </button>
       <p style={{ margin: 0 }}>
         <Link href="/auth/sign-up">Create account</Link>
       </p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          className="ss-btn ss-btn-ghost"
-          onClick={() => {
-            setEmail("maya@softspark.dev");
-            setPassword("spark-demo-maya");
-          }}
-        >
+        <button type="button" className="ss-btn ss-btn-ghost" disabled={busy} onClick={() => fillDemo(DEMO_ACCOUNTS.maya)}>
           Maya demo
         </button>
         <button
           type="button"
           className="ss-btn ss-btn-ghost"
-          onClick={() => {
-            setEmail("jordan@softspark.dev");
-            setPassword("spark-demo-jordan");
-          }}
+          disabled={busy}
+          onClick={() => fillDemo(DEMO_ACCOUNTS.jordan)}
         >
           Jordan demo
         </button>

@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { SparkDb } from "@soft-spark/db";
-import type { LookingFor, OnboardBody, PriceTier } from "@soft-spark/shared";
+import type { OnboardBody } from "@soft-spark/shared";
 import type { Auth } from "./auth.js";
 import { authMode, resolveSession } from "./auth.js";
 import type { EventLog } from "./event-log.js";
+import { allowDemoUsers, healthPayload } from "./env.js";
+import { ensureDemoUsers } from "./ensure-demo-users.js";
 import {
   assertClientSafe,
   toBotDto,
@@ -13,12 +15,12 @@ import {
   toMatchListItem,
   toUserDto,
 } from "./map-client.js";
+import { completeOnboard } from "./onboard.js";
 import { createEngine, orchestrateMatch, respondInvite } from "./orchestrate.js";
 import type { PushDispatcher } from "./push.js";
 import type { RealtimeHub } from "./realtime.js";
 import type { SparkStore } from "./store.js";
 import { honoCors } from "./cors.js";
-import { healthPayload } from "./env.js";
 
 export type AppEnv = {
   Variables: { userId: string; authId: string };
@@ -74,70 +76,10 @@ export function createApp(deps: AppDeps) {
 
     const session = await resolveSession(auth, db, c.req.raw.headers);
     const email = session?.user.email ?? `${authId}@users.softspark`;
-    const existing = await store.userByAuthId(authId);
-    const user = existing
-      ? await store.updateUser(existing.id, {
-          displayName: profile.displayName,
-          age: profile.age,
-          gender: profile.gender,
-          interestedIn: profile.interestedIn ?? [],
-          bio: profile.bio,
-          photoUrl: body.photoUrl,
-          homeLat: body.homeGeo.lat,
-          homeLng: body.homeGeo.lng,
-          homeTz: body.homeTz ?? "America/Denver",
-        })
-      : await store.createUser({
-          authId,
-          email,
-          displayName: profile.displayName,
-          age: profile.age,
-          gender: profile.gender,
-          interestedIn: profile.interestedIn ?? [],
-          bio: profile.bio,
-          photoUrl: body.photoUrl,
-          homeLat: body.homeGeo.lat,
-          homeLng: body.homeGeo.lng,
-          homeTz: body.homeTz ?? "America/Denver",
-          botDatingOptIn: true,
-        });
-
-    if (!(await store.botForUser(user.id))) {
-      await store.createBot({
-        userId: user.id,
-        vibeTags: body.vibeTags ?? [],
-        active: true,
-        paused: false,
-      });
-    } else if (body.vibeTags) {
-      await store.updateBot(user.id, { vibeTags: body.vibeTags });
-    }
-
-    try {
-      await store.prefsForUser(user.id);
-      await store.updatePrefs(user.id, {
-        cuisine: prefs.cuisine,
-        budget: prefs.budget as PriceTier,
-        maxTravelKm: prefs.maxTravelKm,
-        dealbreakers: prefs.dealbreakers ?? [],
-        lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
-        interests: prefs.interests ?? [],
-      });
-    } catch {
-      await store.createPrefs({
-        userId: user.id,
-        cuisine: prefs.cuisine,
-        budget: prefs.budget as PriceTier,
-        maxTravelKm: prefs.maxTravelKm,
-        dealbreakers: prefs.dealbreakers ?? [],
-        lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
-        interests: prefs.interests ?? [],
-      });
-    }
-
-    const payload = { user: await toUserDto(store, user.id), bot: await toBotDto(store, user.id) };
+    const result = await completeOnboard(store, { authId, email, body });
+    const payload = { user: await toUserDto(store, result.user.id), bot: await toBotDto(store, result.user.id) };
     assertClientSafe(payload);
-    return c.json(payload, existing ? 200 : 201);
+    return c.json(payload, result.created ? 201 : 200);
   });
 
   app.get("/users/me", async (c) => {
@@ -320,6 +262,24 @@ export function createApp(deps: AppDeps) {
         await stream.sleep(15000);
       }
     });
+  });
+
+  app.post("/internal/ensure-demo-users", async (c) => {
+    if (!allowDemoUsers()) return c.json({ error: "not_found" }, 404);
+    try {
+      return c.json(
+        await ensureDemoUsers({
+          store,
+          auth,
+          db,
+          events,
+          hub,
+          push,
+        })
+      );
+    } catch (err) {
+      return handleErr(c, err);
+    }
   });
 
   app.post("/internal/orchestrate", async (c) => {
