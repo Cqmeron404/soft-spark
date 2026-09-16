@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Soft spark",
+    "slug": "soft-spark",
+    "scheme": "softspark",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": false },
+    "android": { "adaptiveIcon": { "backgroundColor": "#F7F1EA" } }
+  }
+}
