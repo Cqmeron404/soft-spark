@@ -6,6 +6,7 @@ import { PGlite } from "@soft-spark/db";
 import { runInviteThresholdRegression } from "@soft-spark/match-engine";
 import { createApp } from "./app.js";
 import { bootstrap } from "./bootstrap.js";
+import { webOrigins } from "./cors.js";
 import { bootMissing, placesMissing } from "./env.js";
 import { runNexusSoakScenarios } from "./nexus-soak.js";
 import { createEngine, orchestrateMatch } from "./orchestrate.js";
@@ -114,6 +115,36 @@ async function main() {
 
   const ctx = await bootstrap({ pglite: new PGlite() });
   const app = createApp(ctx);
+
+  process.env.WEB_ORIGIN ??= "http://localhost:3000";
+  const webOrigin = webOrigins()[0];
+  const preflight = await app.request("/auth/sign-up/email", {
+    method: "OPTIONS",
+    headers: {
+      Origin: webOrigin,
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "content-type",
+    },
+  });
+  const preflightOrigin = preflight.headers.get("access-control-allow-origin");
+  const preflightCreds = preflight.headers.get("access-control-allow-credentials");
+  const preflightMethods = preflight.headers.get("access-control-allow-methods") ?? "";
+  if (preflight.status !== 204 || preflightOrigin !== webOrigin || preflightCreds !== "true" || !preflightMethods.includes("POST")) {
+    failures.push(
+      `auth OPTIONS CORS expected 204 + WEB_ORIGIN + credentials, got ${preflight.status} origin=${preflightOrigin} creds=${preflightCreds} methods=${preflightMethods}`
+    );
+  } else console.log("ok  OPTIONS /auth/sign-up/email CORS for WEB_ORIGIN");
+
+  const blocked = await app.request("/auth/sign-up/email", {
+    method: "OPTIONS",
+    headers: {
+      Origin: "https://evil.example",
+      "Access-Control-Request-Method": "POST",
+    },
+  });
+  if (blocked.headers.get("access-control-allow-origin") === "https://evil.example") {
+    failures.push("auth OPTIONS must not echo an untrusted Origin");
+  } else console.log("ok  OPTIONS /auth/* does not reflect untrusted Origin");
 
   const unauth = await app.request("/matches");
   if (unauth.status !== 401) failures.push(`protected /matches expected 401, got ${unauth.status}`);

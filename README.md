@@ -67,8 +67,10 @@ Required (Phase 1 auth/DB — Vercel **API** project):
 - `DATABASE_URL` — Postgres URL
 - `BETTER_AUTH_SECRET` — 32+ char signing secret (`AUTH_SECRET` alias)
 - `BETTER_AUTH_URL` — public API origin (`https://soft-spark-api.vercel.app`)
-- `WEB_ORIGIN` — public web origin (`https://soft-spark.vercel.app`)
+- `WEB_ORIGIN` — public web origin (`https://soft-spark.vercel.app`). Must match the browser `Origin` header exactly (no trailing slash). Used for CORS `Access-Control-Allow-Origin` and Better Auth `trustedOrigins`.
 - `AUTH_MODE=prod` — optional; already implied when `NODE_ENV=production`
+
+**Cookies (cross-site Hobby):** web `soft-spark.vercel.app` and API `soft-spark-api.vercel.app` are different sites (`vercel.app` is a public suffix — do **not** set cookie `Domain=.vercel.app`). The API sets host-only session cookies with `SameSite=None; Secure` in production so credentialed `fetch(..., { credentials: "include" })` can store them. Keep `BETTER_AUTH_URL=https://soft-spark-api.vercel.app` (API public origin, no trailing slash).
 
 Venues (**$0 go-live**, Vercel API) — pick **one**:
 
@@ -108,7 +110,7 @@ Copy `.env.example` locally. Set the same names in Vercel / Fly / Render dashboa
 | `BETTER_AUTH_SECRET` | **prod boot** | Auth signing secret (`AUTH_SECRET` alias). Dev default is rejected in production. |
 | `BETTER_AUTH_URL` | prod | Public API origin, default `http://localhost:8787`. |
 | `AUTH_MODE` | no | `prod` disables `x-user-id` bypass (also off when `NODE_ENV=production`). |
-| `WEB_ORIGIN` | prod | CORS / Better Auth trusted origin, default `http://localhost:3000`. |
+| `WEB_ORIGIN` | prod | Exact web origin(s) for CORS + Better Auth `trustedOrigins`. No trailing slash. Comma-separated if needed. Live: `https://soft-spark.vercel.app`. |
 | `GOOGLE_PLACES_API_KEY` | prod Places | Nearby search when seed is **not** forced. 0 results → `exploring` + `match.venue_unavailable`. |
 | `ALLOW_VENUE_SEED` | $0 venues | `1` allows Denver catalog seed **and** catalog VenueSuggester in production (no Places key). |
 | `VENUE_MODE` | $0 venues | `seed` same as `ALLOW_VENUE_SEED=1`. Forced seed wins over a present Places key. Unset + key → `places`. |

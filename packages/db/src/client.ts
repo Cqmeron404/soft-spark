@@ -52,7 +52,13 @@ export async function openDb(options: OpenDbOptions = {}): Promise<OpenDbResult>
     };
   }
   if (isPostgresUrl(databaseUrl)) {
-    const sql = postgres(databaseUrl, { max: 8 });
+    const sql = postgres(databaseUrl, {
+      max: process.env.VERCEL ? 1 : 8,
+      idle_timeout: process.env.VERCEL ? 20 : 0,
+      connect_timeout: 10,
+      // Neon/Supabase poolers (and pgbouncer) hang on prepared statements.
+      prepare: false,
+    });
     const db = drizzlePg(sql, { schema });
     return {
       db,

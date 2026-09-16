@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
-import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import type { SparkDb } from "@soft-spark/db";
 import type { LookingFor, OnboardBody, PriceTier } from "@soft-spark/shared";
@@ -18,6 +17,7 @@ import { createEngine, orchestrateMatch, respondInvite } from "./orchestrate.js"
 import type { PushDispatcher } from "./push.js";
 import type { RealtimeHub } from "./realtime.js";
 import type { SparkStore } from "./store.js";
+import { honoCors } from "./cors.js";
 import { healthPayload } from "./env.js";
 
 export type AppEnv = {
@@ -36,16 +36,7 @@ export type AppDeps = {
 export function createApp(deps: AppDeps) {
   const { store, auth, hub, events, db, push } = deps;
   const app = new Hono<AppEnv>();
-  const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
-  app.use(
-    "/*",
-    cors({
-      origin: (origin) => origin || webOrigin,
-      credentials: true,
-      allowHeaders: ["Content-Type", "Authorization", "x-user-id"],
-      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    })
-  );
+  app.use("*", honoCors());
 
   app.get("/health", (c) => c.json(healthPayload()));
 
@@ -56,7 +47,7 @@ export function createApp(deps: AppDeps) {
     })
   );
 
-  app.on(["POST", "GET"], "/auth/*", (c) => auth.handler(c.req.raw));
+  app.all("/auth/*", (c) => auth.handler(c.req.raw));
 
   app.use("/users/me/*", (c, next) => requireSession(c, next, { store, auth, db }));
   app.use("/users/me", (c, next) => requireSession(c, next, { store, auth, db }));
