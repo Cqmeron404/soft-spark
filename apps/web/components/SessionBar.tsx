@@ -48,14 +48,18 @@ export function SessionBar() {
             </span>
             <button
               type="button"
+              id="ss-sign-out"
               className="ss-btn ss-btn-ghost"
               style={{ minHeight: 44, padding: "0 12px", fontSize: 13, zIndex: 2 }}
               onClick={() => {
                 clearSession();
                 writeToken(null);
-                void signOut().finally(() => {
-                  window.location.assign("/");
-                });
+                void signOut()
+                  .catch(() => undefined)
+                  .finally(() => {
+                    // Must change the path — assign("/") is a no-op on Home.
+                    window.location.assign("/onboard?new=1");
+                  });
               }}
             >
               Sign out

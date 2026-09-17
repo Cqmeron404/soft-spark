@@ -22,9 +22,14 @@ export default function OnboardPage() {
         setReady(true);
         return;
       }
+      const fresh = new URLSearchParams(window.location.search).get("new") === "1";
       try {
         await getMe();
         const bot = await getBot();
+        if (fresh) {
+          setReady(true);
+          return;
+        }
         if (bot.publishedAt) {
           router.replace("/");
           return;
