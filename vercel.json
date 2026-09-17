@@ -3,6 +3,5 @@
   "framework": "nextjs",
   "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @soft-spark/web... build",
-  "outputDirectory": "apps/web/.next",
-  "ignoreCommand": "git rev-parse --verify HEAD^ >/dev/null 2>&1 && git diff --quiet HEAD^ HEAD -- apps/web packages/ui packages/shared package.json pnpm-lock.yaml; code=$?; if [ $code -eq 0 ]; then exit 0; else exit 1; fi"
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- apps/web packages/ui packages/shared package.json pnpm-lock.yaml"
 }
