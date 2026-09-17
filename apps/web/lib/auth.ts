@@ -51,8 +51,10 @@ export async function signOut() {
   try {
     await Promise.race([
       authJson("/auth/sign-out", { method: "POST" }),
-      new Promise((_, reject) => window.setTimeout(() => reject(new Error("sign-out timeout")), 2000)),
+      new Promise((_, reject) => window.setTimeout(() => reject(new Error("sign-out timeout")), 4000)),
     ]);
+  } catch {
+    // Cookie clear still happens in finally so Welcome can mint a new guest.
   } finally {
     writeToken(null);
   }

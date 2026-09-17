@@ -17,7 +17,7 @@ export function WelcomeLanding() {
       <p style={{ margin: 0, color: "var(--ss-text-muted)", lineHeight: 1.45, fontSize: 16 }}>
         {TAGLINE}
       </p>
-      <Link href="/onboard" className="ss-btn ss-btn-primary">
+      <Link href="/onboard?new=1" className="ss-btn ss-btn-primary">
         Get started
       </Link>
       <ol className="ss-how-it-works">

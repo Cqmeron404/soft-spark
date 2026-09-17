@@ -15,14 +15,14 @@ export default function OnboardPage() {
 
   useEffect(() => {
     void (async () => {
+      const fresh = new URLSearchParams(window.location.search).get("new") === "1";
       try {
-        const data = await ensureGuestSession();
+        const data = await ensureGuestSession("You", { replace: fresh });
         setName(data.user.name ?? "");
       } catch {
         setReady(true);
         return;
       }
-      const fresh = new URLSearchParams(window.location.search).get("new") === "1";
       try {
         await getMe();
         const bot = await getBot();
