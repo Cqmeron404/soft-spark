@@ -4,26 +4,29 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { BotDto, UserDto } from "@soft-spark/shared";
 import { SearchVizPanel, TAGLINE } from "@soft-spark/ui";
-import { WelcomeLanding } from "@/components/WelcomeLanding";
+import { OnboardWizard } from "@/components/OnboardWizard";
 import { getAuthSession } from "@/lib/auth";
 import { getBot, getMe } from "@/lib/api";
+import { ensureGuestSession } from "@/lib/guest-session";
 import { writeSession } from "@/lib/session";
 
 export default function Home() {
-  const [mode, setMode] = useState<"loading" | "welcome" | "home">("loading");
+  const [mode, setMode] = useState<"loading" | "create" | "home">("loading");
   const [me, setMe] = useState<UserDto | null>(null);
   const [bot, setBot] = useState<BotDto | null>(null);
 
   useEffect(() => {
     void (async () => {
       const signedOut = new URLSearchParams(window.location.search).get("out") === "1";
-      if (signedOut) {
-        setMode("welcome");
-        return;
-      }
-      const session = await getAuthSession();
-      if (!session?.user) {
-        setMode("welcome");
+      try {
+        if (signedOut) {
+          await ensureGuestSession("You", { replace: true });
+        } else {
+          const session = await getAuthSession();
+          if (!session?.user) await ensureGuestSession();
+        }
+      } catch {
+        setMode("create");
         return;
       }
       try {
@@ -37,7 +40,7 @@ export default function Home() {
         }
         setMode("home");
       } catch {
-        window.location.replace("/onboard");
+        setMode("create");
       }
     })();
   }, []);
@@ -46,8 +49,8 @@ export default function Home() {
     return <p style={{ color: "var(--ss-text-muted)" }}>Catching up…</p>;
   }
 
-  if (mode === "welcome" || !me) {
-    return <WelcomeLanding />;
+  if (mode === "create" || !me) {
+    return <OnboardWizard />;
   }
 
   const botName = bot?.botDisplayName?.trim() || bot?.displayName?.trim() || `${me.displayName}'s bot`;

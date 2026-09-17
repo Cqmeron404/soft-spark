@@ -1,8 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "pnpm install && pnpm --filter @soft-spark/shared build",
-  "buildCommand": "pnpm --filter @soft-spark/shared build && pnpm --filter @soft-spark/web exec next build",
-  "outputDirectory": "apps/web/.next",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter @soft-spark/web... build",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- apps/web packages/ui packages/shared package.json pnpm-lock.yaml"
 }

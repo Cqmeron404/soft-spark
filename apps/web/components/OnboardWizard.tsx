@@ -12,6 +12,7 @@ import {
 } from "@soft-spark/shared";
 import { PhotoCrop, SoftError } from "@soft-spark/ui";
 import { ChipField } from "@/components/ChipField";
+import { QuietDemoLinks } from "@/components/DemoSignInButtons";
 import { PublishActions } from "@/components/PublishActions";
 import { onboard } from "@/lib/api";
 import { CITY_NEIGHBORHOODS, DEFAULT_CITY, geoForPlace } from "@/lib/guest";
@@ -189,6 +190,7 @@ export function OnboardWizard(props: { defaultName?: string }) {
               placeholder="Optional · 80 characters"
             />
           </label>
+          <QuietDemoLinks />
         </>
       ) : null}
 
