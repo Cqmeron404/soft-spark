@@ -6,13 +6,14 @@ import { usePathname } from "next/navigation";
 import { TabVisual, type TabItem } from "@soft-spark/ui";
 import { PushOptIn } from "@/components/PushOptIn";
 import { SessionBar } from "@/components/SessionBar";
+import { ROAM_HREF, tabIsCurrent } from "@/lib/nav";
 import { SESSION_EVENT, readSession } from "@/lib/session";
 
 const TABS: Array<Omit<TabItem, "current">> = [
   { href: "/", label: "Home", icon: "home" },
   { href: "/create", label: "Create", icon: "create" },
   { href: "/profile", label: "Profile", icon: "profile" },
-  { href: "/matches", label: "Roam", icon: "roam" },
+  { href: ROAM_HREF, label: "Roam", icon: "roam" },
 ];
 
 function isAuthPath(pathname: string) {
@@ -47,7 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {TABS.map((tab) => {
               const item = {
                 ...tab,
-                current: tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href),
+                current: tabIsCurrent(pathname, tab.href),
               };
               return (
                 <Link

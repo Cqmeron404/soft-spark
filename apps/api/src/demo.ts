@@ -386,6 +386,62 @@ async function main() {
     failures.push(`publish roam failed: ${JSON.stringify(leanPublish)}`);
   } else console.log("ok  POST /users/me/bot/publish → roam / roaming");
 
+  const roamSignUp = await app.request("/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "roam.bearer@softspark.dev",
+      password: "spark-demo-roam-bearer",
+      name: "Roam",
+    }),
+  });
+  const roamCookie = cookiesFrom(roamSignUp);
+  const roamAuth = await json<{ token?: string; user?: { id?: string } }>(roamSignUp);
+  const roamToken =
+    roamAuth.token ??
+    roamCookie
+      .split("; ")
+      .find((part) => part.startsWith("better-auth.session_token="))
+      ?.slice("better-auth.session_token=".length);
+  if (roamSignUp.status >= 400 || !roamToken) {
+    failures.push(
+      `Bearer sign-up should return a token for Hobby web, got ${roamSignUp.status} ${JSON.stringify(roamAuth)}`
+    );
+  } else {
+    const bearer = { authorization: `Bearer ${roamToken}`, "content-type": "application/json" };
+    const roamOnboard = await app.request("/users/me/onboard", {
+      method: "POST",
+      headers: bearer,
+      body: JSON.stringify({
+        botDatingOptIn: true,
+        profile: { displayName: "Roam", age: 28, gender: "woman", interestedIn: ["man"] },
+        prefs: { cuisine: ["italian"], budget: 2, maxTravelKm: 15, dealbreakers: [] },
+        homeGeo: { lat: 39.74, lng: -104.98 },
+      }),
+    });
+    if (roamOnboard.status >= 400) {
+      failures.push(`Bearer-only onboard expected 2xx, got ${roamOnboard.status} ${await roamOnboard.text()}`);
+    }
+    const roamPublish = await app.request("/users/me/bot/publish", {
+      method: "POST",
+      headers: bearer,
+      body: JSON.stringify({ preferredAction: "roam" }),
+    });
+    const roamPublished = await json<{ publishedAt?: string; roamStatus?: string; error?: string }>(roamPublish);
+    if (roamPublish.status >= 400 || !roamPublished.publishedAt || roamPublished.roamStatus !== "roaming") {
+      failures.push(`Bearer-only publish expected roaming, got ${roamPublish.status} ${JSON.stringify(roamPublished)}`);
+    }
+    const roamMatches = await app.request("/matches", { headers: { authorization: bearer.authorization } });
+    const roamBot = await app.request("/users/me/bot", { headers: { authorization: bearer.authorization } });
+    if (roamMatches.status !== 200) {
+      failures.push(`Bearer GET /matches after publish expected 200 not onboard, got ${roamMatches.status}`);
+    } else if (roamBot.status !== 200) {
+      failures.push(`Bearer GET /users/me/bot after publish expected 200, got ${roamBot.status}`);
+    } else {
+      console.log("ok  Bearer-only publish → GET /matches (Hobby token, no cookie)");
+    }
+  }
+
   const leanNamed = await json<{ displayName?: string }>(
     await app.request("/users/me/bot", {
       method: "PATCH",

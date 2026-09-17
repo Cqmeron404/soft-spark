@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { ClientRealtimeEvent, MatchListItem } from "@soft-spark/shared";
 import { ConnectingCaption, MatchCard, SoftToast } from "@soft-spark/ui";
 import { BotSearchAction, matchHref } from "@/components/BotSearchAction";
@@ -15,8 +15,17 @@ function isLiveMatch(state: string) {
 }
 
 export default function MatchesPage() {
+  return (
+    <Suspense fallback={<p style={{ color: "var(--ss-text-muted)" }}>Catching up…</p>}>
+      <MatchesBody />
+    </Suspense>
+  );
+}
+
+function MatchesBody() {
   const router = useRouter();
-  const [autoRoam, setAutoRoam] = useState(false);
+  const searchParams = useSearchParams();
+  const autoRoam = searchParams.get("roam") === "1";
   const [items, setItems] = useState<MatchListItem[] | null>(null);
   const [botName, setBotName] = useState("Your bot");
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +59,6 @@ export default function MatchesPage() {
   }
 
   useEffect(() => {
-    setAutoRoam(new URLSearchParams(window.location.search).get("roam") === "1");
     void load();
   }, []);
 

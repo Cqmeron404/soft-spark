@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SoftError } from "@soft-spark/ui";
 import { publishBot } from "@/lib/api";
+import { ROAM_HREF } from "@/lib/nav";
 
 export function PublishActions(props: { botName?: string; onPublished?: () => void }) {
   const router = useRouter();
@@ -17,7 +18,7 @@ export function PublishActions(props: { botName?: string; onPublished?: () => vo
     try {
       await publishBot("roam");
       props.onPublished?.();
-      router.push("/matches?roam=1");
+      router.push(ROAM_HREF);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not publish");
     } finally {
