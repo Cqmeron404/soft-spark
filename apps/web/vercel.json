@@ -1,5 +1,5 @@
 {
-  "framework": "nextjs",
+  "buildCommand": "cd ../.. && pnpm --filter @soft-spark/web... build",
   "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "cd ../.. && pnpm --filter @soft-spark/web... build"
+  "framework": "nextjs"
 }
