@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./search-viz": "./src/SearchVizPanel.tsx",
     "./tokens.css": "./src/tokens.css"
   },
   "scripts": {

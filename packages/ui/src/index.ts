@@ -12,5 +12,3 @@ export { BotSearchCard, searchLineForElapsed } from "./BotSearchCard";
 export type { BotSearchPhase } from "./BotSearchCard";
 export { TabBar, TabVisual } from "./TabBar";
 export type { TabItem } from "./TabBar";
-export { SearchVizPanel } from "./SearchVizPanel";
-export type { SearchVizPhase, SearchVizStatus } from "./SearchVizPanel";

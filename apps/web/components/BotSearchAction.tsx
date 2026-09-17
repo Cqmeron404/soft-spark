@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LookingForGender, MatchDetail, MatchListItem, ProfileGender } from "@soft-spark/shared";
 import { BOT_SEARCH_ETA } from "@soft-spark/shared";
-import { SearchVizPanel, type SearchVizPhase } from "@soft-spark/ui";
+import { SearchVizPanel, type SearchVizPhase } from "@soft-spark/ui/search-viz";
 import { getMe, searchForDate } from "@/lib/api";
 
 const MIN_SEARCH_MS = BOT_SEARCH_ETA.typicalSeconds * 1000;

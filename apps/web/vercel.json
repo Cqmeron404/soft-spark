@@ -1,6 +1,6 @@
 {
-  "framework": "nextjs",
-  "installCommand": "cd ../.. && pnpm install",
   "buildCommand": "cd ../.. && pnpm --filter @soft-spark/web... build",
-  "ignoreCommand": "/bin/false"
+  "installCommand": "cd ../.. && pnpm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next"
 }

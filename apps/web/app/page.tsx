@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { BotDto, UserDto } from "@soft-spark/shared";
-import { SearchVizPanel, TAGLINE } from "@soft-spark/ui";
+import { TAGLINE } from "@soft-spark/ui";
+import { SearchVizPanel } from "@soft-spark/ui/search-viz";
 import { OnboardWizard } from "@/components/OnboardWizard";
 import { getAuthSession } from "@/lib/auth";
 import { getBot, getMe } from "@/lib/api";
