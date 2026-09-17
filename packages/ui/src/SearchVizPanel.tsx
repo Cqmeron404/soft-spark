@@ -40,7 +40,13 @@ function seedNumber(seed: string | undefined, lookingForGender: LookingForGender
   return lookingForGender === "female" ? 0xc0ff11 : lookingForGender === "male" ? 0xc0ff22 : 0xc0ffee;
 }
 
-/** Aura mock silhouette: 3 hubs + ~52 mixed periphery, nearest-neighbor spokes. */
+function pickCohort(rand: () => number, lookingForGender: LookingForGender, hubIndex?: number): GraphGender {
+  if (lookingForGender === "male" || lookingForGender === "female") return lookingForGender;
+  if (hubIndex != null) return hubIndex % 2 ? "female" : "male";
+  return rand() > 0.48 ? "female" : "male";
+}
+
+/** Aura mock silhouette: 3 hubs + ~52 periphery. Non-target genders omitted. */
 function seedGraph(lookingForGender: LookingForGender, seed?: string): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const rand = mulberry32(seedNumber(seed, lookingForGender));
   const nodes: GraphNode[] = [];
@@ -53,7 +59,7 @@ function seedGraph(lookingForGender: LookingForGender, seed?: string): { nodes: 
   hubs.forEach((h, i) => {
     nodes.push({
       ...h,
-      gender: i % 2 ? "female" : "male",
+      gender: pickCohort(rand, lookingForGender, i),
       hub: true,
     });
   });
@@ -64,7 +70,7 @@ function seedGraph(lookingForGender: LookingForGender, seed?: string): { nodes: 
       x: WIDTH * (0.5 + Math.cos(a) * rad * 0.95),
       y: HEIGHT * (0.48 + Math.sin(a) * rad * 0.85),
       r: 5 + rand() * 2,
-      gender: rand() > 0.48 ? "female" : "male",
+      gender: pickCohort(rand, lookingForGender),
     });
   }
 
@@ -253,13 +259,15 @@ export function SearchVizPanel(props: {
         borderRadius: 22,
         height: props.compact ? 148 : 420,
         overflow: "hidden",
+        padding: 12,
+        boxSizing: "border-box",
         boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
       }}
       role="img"
       aria-label={
         hopping
-          ? "Network of nearby bots. Pink is female, blue is male. Your bot hops along edges. Status only, no chat."
-          : "Dating-pool graph. Pink is female, blue is male. Status only, no chat."
+          ? `Dating-pool graph. Your bot hops toward ${lookingForGender === "both" ? "everyone" : lookingForGender}. Pink is female, blue is male. Status only, no chat.`
+          : `Dating-pool graph. Pink is female, blue is male. ${lookingForGender === "both" ? "Showing everyone." : `Showing ${lookingForGender} only.`} Status only, no chat.`
       }
     >
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" height="100%" aria-hidden>
@@ -340,7 +348,7 @@ export function SearchVizPanel(props: {
       {well}
       <div className="ss-graph-footer">
         <BandChip band={band} />
-        <span className="ss-graph-hint">Simulated hop · status only</span>
+        <span className="ss-graph-hint">{status === "paused" ? "Paused" : "Looking for chemistry"}</span>
       </div>
       {props.phase === "idle" || props.phase === "empty" ? (
         <button type="button" className="ss-btn ss-btn-primary" disabled={props.disabled} onClick={props.onSearch}>
