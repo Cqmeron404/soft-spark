@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="ss-phone">
         <SessionBar />
         <main className="ss-phone-body">
-          {children}
+          {children as never}
           <PushOptIn />
         </main>
         {hideTabs ? null : (
