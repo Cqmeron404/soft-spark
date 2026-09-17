@@ -1,5 +1,4 @@
 {
   "framework": "nextjs",
-  "installCommand": "cd ../.. && pnpm install && pnpm --filter @soft-spark/shared build",
-  "buildCommand": "cd ../.. && pnpm --filter @soft-spark/web run build"
+  "installCommand": "cd ../.. && pnpm install && pnpm --filter @soft-spark/shared build"
 }
