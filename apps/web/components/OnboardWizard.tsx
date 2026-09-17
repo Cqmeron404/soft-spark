@@ -399,7 +399,7 @@ export function OnboardWizard(props: { defaultName?: string }) {
             <p style={{ margin: 0, fontFamily: "var(--ss-font-display)", fontSize: 22 }}>{botDisplayName || "Your bot"}</p>
             {vibeLine ? <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>{vibeLine}</p> : null}
             <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>
-              {displayName || "You"} · {gender} · interested in {lookingForGender} · {intent}
+              {displayName || "You"} · {gender} · looking for {lookingForGender} · {intent}
             </p>
             <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>
               {city} / {neighborhood} · {maxTravelMiles} miles
@@ -416,7 +416,7 @@ export function OnboardWizard(props: { defaultName?: string }) {
             <p style={{ margin: 0, fontFamily: "var(--ss-font-display)", fontSize: 22 }}>{botDisplayName || "Your bot"}</p>
             {vibeLine ? <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>{vibeLine}</p> : null}
             <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>
-              {displayName || "You"} · {gender} · interested in {lookingForGender} · {intent}
+              {displayName || "You"} · {gender} · looking for {lookingForGender} · {intent}
             </p>
             <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>
               {city} / {neighborhood} · {maxTravelMiles} miles

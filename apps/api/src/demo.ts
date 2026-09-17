@@ -296,6 +296,7 @@ async function main() {
     lookingForGender?: string;
     prefs?: {
       intent?: string;
+      lookingFor?: string;
       lookingForGender?: string;
       ageRangeMin?: number;
       ageRangeMax?: number;
@@ -320,6 +321,9 @@ async function main() {
   ) {
     failures.push(`onboard did not persist Spark gender/intent: ${JSON.stringify(mayaProfile)}`);
   } else console.log("ok  onboard persisted Spark gender / lookingForGender / intent");
+  if (mayaProfile.prefs && "lookingFor" in mayaProfile.prefs && mayaProfile.prefs.lookingFor != null) {
+    failures.push("UserDto prefs must not overload lookingFor — use intent + lookingForGender");
+  } else console.log("ok  UserDto prefs.intent is not overloaded onto lookingFor");
   if (
     mayaProfile.heightCm !== 168 ||
     mayaProfile.hair !== "dark brown" ||

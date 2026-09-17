@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { normalizeGender } from "@soft-spark/shared";
 import type { ConfidenceBand, LookingForGender, ProfileGender } from "@soft-spark/shared";
 import { BandChip } from "./BandChip";
 import { tokens } from "./tokens";
@@ -156,8 +157,13 @@ export function SearchVizPanel(props: {
   disabled?: boolean;
   botName?: string;
   compact?: boolean;
+  /** Live matches mapped onto targetable nodes. Tap opens match detail (bands only). */
+  targets?: Array<{ id: string }>;
+  onSelectTarget?: (id: string) => void;
 }) {
   const lookingForGender = props.lookingForGender ?? "both";
+  const youGender = normalizeGender(props.youGender) ?? "female";
+  const youFill = youGender === "male" ? tokens.graph.male : tokens.graph.female;
   const { nodes, edges } = useMemo(() => seedGraph(lookingForGender), [lookingForGender]);
   const cycle = useMemo(() => hopCycle(nodes, edges, lookingForGender), [nodes, edges, lookingForGender]);
   const [hopIndex, setHopIndex] = useState(0);
@@ -166,6 +172,15 @@ export function SearchVizPanel(props: {
   const searching = props.phase === "searching";
   const hopMs = tokens.graph.hopMs;
   const targetable = (gender: GraphGender) => lookingForGender === "both" || gender === lookingForGender;
+  const targetByNode = useMemo(() => {
+    const map = new Map<string, string>();
+    const slots = nodes.filter((n) => !n.isolated && (lookingForGender === "both" || n.gender === lookingForGender));
+    (props.targets ?? []).forEach((target, i) => {
+      const slot = slots[i];
+      if (slot) map.set(slot.id, target.id);
+    });
+    return map;
+  }, [nodes, props.targets, lookingForGender]);
 
   useEffect(() => {
     if (!searching || reduced || cycle.length < 2) {
@@ -213,14 +228,20 @@ export function SearchVizPanel(props: {
     <div style={{ display: "grid", gap: 14 }}>
       <div
         className={props.compact ? "ss-graph-well ss-graph-well-compact" : "ss-graph-well"}
-        role="img"
+        style={{
+          background: tokens.graph.well,
+          borderRadius: 22,
+          height: props.compact ? 148 : 280,
+          overflow: "hidden",
+        }}
+        role={props.targets?.length ? "group" : "img"}
         aria-label={
           searching
             ? `Network of nearby bots. Pink is female, blue is male. Filtered-out genders are grey. Your bot hops toward ${lookingForGender === "both" ? "everyone" : lookingForGender}.`
             : "Dating-pool graph. Pink is female, blue is male. Grey nodes are filtered out by lookingForGender."
         }
       >
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" height="100%" aria-hidden>
+        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" height="100%" aria-hidden={props.targets?.length ? undefined : true}>
           {edges.map((edge) => {
             const a = nodes.find((n) => n.id === edge.from)!;
             const b = nodes.find((n) => n.id === edge.to)!;
@@ -250,20 +271,55 @@ export function SearchVizPanel(props: {
           ) : null}
           {nodes.map((node) => {
             const open = targetable(node.gender);
+            const matchId = targetByNode.get(node.id);
             return (
-              <circle
+              <g
                 key={node.id}
-                cx={node.x}
-                cy={node.y}
-                r={node.r}
-                fill={open ? (node.gender === "female" ? tokens.graph.female : tokens.graph.male) : tokens.graph.filtered}
-                opacity={open ? (node.isolated ? 0.7 : 1) : 0.4}
-                style={{ cursor: open ? "pointer" : "not-allowed" }}
-              />
+                role={matchId ? "button" : undefined}
+                tabIndex={matchId ? 0 : undefined}
+                aria-label={
+                  open
+                    ? matchId
+                      ? `Open match — ${node.gender}`
+                      : `${node.gender} bot`
+                    : `${node.gender} bot, filtered out`
+                }
+                style={{ cursor: open ? (matchId ? "pointer" : "default") : "not-allowed" }}
+                onClick={() => {
+                  if (!open || !matchId) return;
+                  props.onSelectTarget?.(matchId);
+                }}
+                onKeyDown={(event) => {
+                  if (!open || !matchId) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    props.onSelectTarget?.(matchId);
+                  }
+                }}
+              >
+                <circle cx={node.x} cy={node.y} r={Math.max(node.r, 8)} fill="transparent" />
+                {matchId ? (
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={node.r + 3.4}
+                    fill="none"
+                    stroke={tokens.graph.youRing}
+                    strokeWidth="1.4"
+                  />
+                ) : null}
+                <circle
+                  cx={node.x}
+                  cy={node.y}
+                  r={node.r}
+                  fill={open ? (node.gender === "female" ? tokens.graph.female : tokens.graph.male) : tokens.graph.filtered}
+                  opacity={open ? (node.isolated ? 0.7 : 1) : 0.4}
+                />
+              </g>
             );
           })}
           <circle cx={you.x} cy={you.y} r={11} fill="none" stroke={tokens.graph.youRing} strokeWidth="2.5" />
-          <circle cx={you.x} cy={you.y} r={6.5} fill={tokens.graph.you} />
+          <circle cx={you.x} cy={you.y} r={6.5} fill={youFill} />
         </svg>
       </div>
       {props.compact ? (

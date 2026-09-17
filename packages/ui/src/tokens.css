@@ -17,6 +17,8 @@
   --ss-graph-female: #e891b0;
   --ss-graph-male: #6ba3e8;
   --ss-graph-you: #f0c4a8;
+  --ss-graph-you-ring: #e8a598;
+  --ss-graph-filtered: #6e655e;
   --ss-font-ui: Inter, "SF Pro Text", system-ui, sans-serif;
   --ss-font-display: Fraunces, Georgia, "Times New Roman", serif;
 }
@@ -263,6 +265,13 @@
 .ss-chip-on {
   background: var(--ss-accent-soft);
   border-color: color-mix(in srgb, var(--ss-accent) 55%, var(--ss-border));
+}
+
+.ss-graph-well {
+  background: var(--ss-graph-well);
+  border-radius: 22px;
+  height: 280px;
+  overflow: hidden;
 }
 
 .ss-graph-well-compact {

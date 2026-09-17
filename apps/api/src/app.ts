@@ -104,7 +104,10 @@ export function createApp(deps: AppDeps) {
     const place = geoForPlace(profile.city, profile.neighborhood);
     const lookingForGender =
       normalizeLookingForGender(prefs.lookingForGender ?? profile.lookingForGender) ??
-      lookingForGenderFromInterestedIn(profile.interestedIn);
+      (profile.interestedIn?.length ? lookingForGenderFromInterestedIn(profile.interestedIn) : undefined);
+    if (!lookingForGender) {
+      return c.json({ error: "lookingForGender (male|female|both) required" }, 400);
+    }
     const gender = normalizeGender(profile.gender)!;
     const intent = normalizeIntent(prefs.intent ?? prefs.lookingFor);
     const heightCm = parseHeightCm(profile.heightCm ?? profile.height);

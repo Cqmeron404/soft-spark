@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ClientRealtimeEvent, MatchListItem } from "@soft-spark/shared";
-import { ConnectingCaption, EmptyState, MatchCard, SoftToast } from "@soft-spark/ui";
-import { BotSearchAction } from "@/components/BotSearchAction";
+import { ConnectingCaption, MatchCard, SoftToast } from "@soft-spark/ui";
+import { BotSearchAction, matchHref } from "@/components/BotSearchAction";
 import { getBot, listMatches } from "@/lib/api";
 import { ensureGuestSession } from "@/lib/guest-session";
 import { useMatchRealtime } from "@/lib/realtime";
@@ -69,7 +69,6 @@ export default function MatchesPage() {
   });
 
   const liveItems = items?.filter((m) => isLiveMatch(m.state)) ?? [];
-  const showSearch = items !== null && liveItems.length === 0;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -84,12 +83,21 @@ export default function MatchesPage() {
         />
       ) : null}
       {error ? <p className="ss-error">{error === "unauthorized" ? "Sign in to keep your bot dating" : error}</p> : null}
-      {showSearch ? <BotSearchAction autoStart={autoRoam} botName={botName} /> : null}
-      {!showSearch && items !== null && liveItems.length === 0 ? (
-        <EmptyState title="No active matches yet — your bot’s exploring" />
+      {items !== null ? (
+        <BotSearchAction
+          autoStart={autoRoam && liveItems.length === 0}
+          botName={botName}
+          targets={liveItems.map((m) => ({ id: m.id }))}
+          onSelectTarget={(id) => {
+            const match = liveItems.find((m) => m.id === id);
+            if (!match) return;
+            const href = matchHref(match);
+            if (href !== "/matches") router.push(href);
+          }}
+        />
       ) : null}
       <div style={{ display: "grid", gap: 12 }}>
-        {items?.map((m) => (
+        {liveItems.map((m) => (
           <MatchCard
             key={m.id}
             peerName={m.peer?.displayName ?? "Someone"}
@@ -97,9 +105,8 @@ export default function MatchesPage() {
             reasons={m.reasons}
             photoUrl={m.peer?.photoUrl}
             onOpen={() => {
-              if (m.state === "invite_ready" || m.state === "invited" || m.state === "booked") {
-                router.push(`/matches/${m.id}/reveal`);
-              }
+              const href = matchHref(m);
+              if (href !== "/matches") router.push(href);
             }}
           />
         ))}
