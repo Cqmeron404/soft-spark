@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "node -e \"process.exit(0)\""
+    "build": "echo skip"
   },
   "dependencies": {
     "@soft-spark/shared": "workspace:*"
