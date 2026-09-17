@@ -79,6 +79,7 @@ export const users = pgTable("users", {
   botDatingOptIn: boolean("bot_dating_opt_in").notNull(),
   status: text("status").notNull().default("active"),
   height: text("height"),
+  heightCm: integer("height_cm"),
   hairColor: text("hair_color"),
   eyeColor: text("eye_color"),
   city: text("city"),
@@ -101,6 +102,7 @@ export const datingBots = pgTable("dating_bots", {
   active: boolean("active").notNull().default(true),
   paused: boolean("paused").notNull().default(false),
   displayName: text("display_name"),
+  vibeLine: text("vibe_line"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   preferredAction: text("preferred_action").notNull().default("wait"),
   roamStatus: text("roam_status"),
@@ -118,6 +120,8 @@ export const preferences = pgTable("preferences", {
   dealbreakers: text("dealbreakers").array().notNull(),
   lookingFor: text("looking_for").notNull().default("unsure"),
   lookingForGender: text("looking_for_gender"),
+  ageRangeMin: integer("age_range_min"),
+  ageRangeMax: integer("age_range_max"),
   interests: text("interests").array().notNull(),
 });
 

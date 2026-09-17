@@ -80,6 +80,8 @@ export type BotDto = {
   paused: boolean;
   /** User-chosen bot name. Falls back to "{displayName}'s bot" in UI if missing. */
   displayName?: string;
+  botDisplayName?: string;
+  vibeLine?: string;
   publishedAt?: string;
   preferredAction: PreferredAction;
   roamStatus: RoamStatus;
@@ -95,8 +97,11 @@ export type UserDto = {
   bio?: string;
   photoUrl?: string;
   height?: string;
+  heightCm?: number;
   hairColor?: string;
+  hair?: string;
   eyeColor?: string;
+  eyes?: string;
   city?: string;
   neighborhood?: string;
   likes: string[];
@@ -116,6 +121,8 @@ export type UserDto = {
     /** Alias of intent for the existing match-engine snapshot. Not gender. */
     lookingFor: LookingFor | string;
     lookingForGender: LookingForGender;
+    ageRangeMin?: number;
+    ageRangeMax?: number;
     /** Mirror of hobbies for the existing match-engine snapshot. */
     interests: string[];
   };
@@ -131,7 +138,10 @@ export type OnboardBody = {
     interestedIn: string[];
     bio?: string;
     height?: string;
+    heightCm?: number;
+    hair?: string;
     hairColor?: string;
+    eyes?: string;
     eyeColor?: string;
     city?: string;
     neighborhood?: string;
@@ -150,6 +160,8 @@ export type OnboardBody = {
     /** Legacy alias of intent — not gender. */
     lookingFor?: LookingFor | string;
     lookingForGender?: LookingForGender;
+    ageRangeMin?: number;
+    ageRangeMax?: number;
     interests?: string[];
   };
   homeGeo?: Geo;
@@ -159,11 +171,13 @@ export type OnboardBody = {
   photoUrl?: string;
   /** Name the dating bot — required for a complete first-time create. */
   botName?: string;
+  botDisplayName?: string;
+  vibeLine?: string;
   /** If true, sets publishedAt during onboard. */
   publish?: boolean;
   preferredAction?: PreferredAction;
 };
 
 export type PublishBotBody = {
-  preferredAction: PreferredAction;
+  preferredAction?: PreferredAction;
 };

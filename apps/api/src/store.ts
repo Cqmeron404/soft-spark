@@ -41,6 +41,7 @@ export type UserRecord = {
   botDatingOptIn: boolean;
   status: string;
   height?: string;
+  heightCm?: number;
   hairColor?: string;
   eyeColor?: string;
   city?: string;
@@ -61,6 +62,7 @@ export type BotRecord = {
   active: boolean;
   paused: boolean;
   displayName?: string;
+  vibeLine?: string;
   publishedAt?: string;
   preferredAction: "roam" | "wait";
   roamStatus?: RoamStatus;
@@ -75,6 +77,8 @@ export type PreferenceRecord = {
   dealbreakers: string[];
   lookingFor: LookingFor;
   lookingForGender?: LookingForGender;
+  ageRangeMin?: number;
+  ageRangeMax?: number;
   interests: string[];
 };
 
@@ -191,6 +195,7 @@ function asUser(row: typeof users.$inferSelect): UserRecord {
     botDatingOptIn: row.botDatingOptIn,
     status: row.status,
     height: row.height ?? undefined,
+    heightCm: row.heightCm ?? undefined,
     hairColor: row.hairColor ?? undefined,
     eyeColor: row.eyeColor ?? undefined,
     city: row.city ?? undefined,
@@ -213,6 +218,7 @@ function asBot(row: typeof datingBots.$inferSelect): BotRecord {
     active: row.active,
     paused: row.paused,
     displayName: row.displayName ?? undefined,
+    vibeLine: row.vibeLine ?? undefined,
     publishedAt: row.publishedAt ? iso(row.publishedAt) : undefined,
     preferredAction: row.preferredAction === "roam" ? "roam" : "wait",
     roamStatus: row.roamStatus === "roaming" || row.roamStatus === "paused" || row.roamStatus === "draft"
@@ -234,6 +240,8 @@ function asPrefs(row: typeof preferences.$inferSelect): PreferenceRecord {
       row.lookingForGender === "male" || row.lookingForGender === "female" || row.lookingForGender === "both"
         ? row.lookingForGender
         : undefined,
+    ageRangeMin: row.ageRangeMin ?? undefined,
+    ageRangeMax: row.ageRangeMax ?? undefined,
     interests: row.interests ?? [],
   };
 }
@@ -337,6 +345,7 @@ export function createDbStore(db: SparkDb) {
           homeTz: input.homeTz,
           botDatingOptIn: input.botDatingOptIn,
           height: input.height,
+          heightCm: input.heightCm,
           hairColor: input.hairColor,
           eyeColor: input.eyeColor,
           city: input.city,
@@ -365,6 +374,7 @@ export function createDbStore(db: SparkDb) {
             homeLng: patch.homeLng,
             homeTz: patch.homeTz,
             height: patch.height,
+            heightCm: patch.heightCm,
             hairColor: patch.hairColor,
             eyeColor: patch.eyeColor,
             city: patch.city,
@@ -392,6 +402,7 @@ export function createDbStore(db: SparkDb) {
           active: input.active,
           paused: input.paused,
           displayName: input.displayName,
+          vibeLine: input.vibeLine,
           publishedAt: input.publishedAt ? new Date(input.publishedAt) : undefined,
           preferredAction: input.preferredAction ?? "wait",
           roamStatus: input.roamStatus,
@@ -413,6 +424,7 @@ export function createDbStore(db: SparkDb) {
           paused: patch.paused ?? cur.paused,
           active: patch.active ?? cur.active,
           displayName: patch.displayName ?? cur.displayName,
+          vibeLine: patch.vibeLine ?? cur.vibeLine,
           publishedAt: patch.publishedAt ? new Date(patch.publishedAt) : cur.publishedAt ? new Date(cur.publishedAt) : null,
           preferredAction: patch.preferredAction ?? cur.preferredAction,
           roamStatus: patch.roamStatus ?? cur.roamStatus,
@@ -433,6 +445,8 @@ export function createDbStore(db: SparkDb) {
           dealbreakers: input.dealbreakers,
           lookingFor: input.lookingFor,
           lookingForGender: input.lookingForGender,
+          ageRangeMin: input.ageRangeMin,
+          ageRangeMax: input.ageRangeMax,
           interests: input.interests,
         })
         .returning();
@@ -454,6 +468,8 @@ export function createDbStore(db: SparkDb) {
           dealbreakers: patch.dealbreakers ?? cur.dealbreakers,
           lookingFor: patch.lookingFor ?? cur.lookingFor,
           lookingForGender: patch.lookingForGender ?? cur.lookingForGender,
+          ageRangeMin: patch.ageRangeMin ?? cur.ageRangeMin,
+          ageRangeMax: patch.ageRangeMax ?? cur.ageRangeMax,
           interests: patch.interests ?? cur.interests,
         })
         .where(eq(preferences.id, cur.id))

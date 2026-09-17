@@ -38,7 +38,7 @@ export default function SignInPage() {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <AppLogo variant="wordmark" size={64} />
-      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 30, margin: 0 }}>Welcome back</h1>
+      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 30, margin: 0 }}>Sign in</h1>
       <label style={{ display: "grid", gap: 6 }}>
         Email
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" />
@@ -54,7 +54,7 @@ export default function SignInPage() {
       </label>
       {error ? <SoftError>{error}</SoftError> : null}
       <button type="button" className="ss-btn ss-btn-primary" disabled={busy} onClick={() => void submit()}>
-        Sign in
+        Continue
       </button>
       <DemoSignInButtons
         busy={busy}

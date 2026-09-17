@@ -6,6 +6,7 @@ import type { OnboardBody, PriceTier } from "@soft-spark/shared";
 import {
   BIO_MAX,
   BOT_NAME_MAX,
+  VIBE_LINE_MAX,
   geoForPlace,
   interestedInFromLookingForGender,
   lookingForGenderFromInterestedIn,
@@ -16,6 +17,7 @@ import {
   normalizePreferredAction,
   normalizeShortText,
   normalizeTagList,
+  parseHeightCm,
   roamStatusFor,
 } from "@soft-spark/shared";
 import type { Auth } from "./auth.js";
@@ -105,6 +107,9 @@ export function createApp(deps: AppDeps) {
       lookingForGenderFromInterestedIn(profile.interestedIn);
     const gender = normalizeGender(profile.gender) ?? profile.gender;
     const intent = normalizeIntent(prefs.intent ?? prefs.lookingFor);
+    const heightCm = parseHeightCm(profile.heightCm ?? profile.height);
+    const hairColor = normalizeShortText(profile.hair ?? profile.hairColor);
+    const eyeColor = normalizeShortText(profile.eyes ?? profile.eyeColor);
     const profilePatch = {
       displayName: profile.displayName,
       age: profile.age,
@@ -116,16 +121,18 @@ export function createApp(deps: AppDeps) {
       homeLat: body.homeGeo?.lat ?? place.lat,
       homeLng: body.homeGeo?.lng ?? place.lng,
       homeTz: body.homeTz ?? "America/Denver",
-      height: normalizeShortText(profile.height),
-      hairColor: normalizeShortText(profile.hairColor),
-      eyeColor: normalizeShortText(profile.eyeColor),
+      height: normalizeShortText(profile.height) ?? (heightCm ? `${heightCm} cm` : undefined),
+      heightCm,
+      hairColor,
+      eyeColor,
       city: normalizeShortText(profile.city ?? place.city),
       neighborhood: normalizeShortText(profile.neighborhood ?? place.neighborhood),
       likes: normalizeTagList(profile.likes),
       dislikes: normalizeTagList(profile.dislikes),
       hobbies,
     };
-    const botName = normalizeShortText(body.botName, BOT_NAME_MAX);
+    const botName = normalizeShortText(body.botDisplayName ?? body.botName, BOT_NAME_MAX);
+    const vibeLine = normalizeShortText(body.vibeLine, VIBE_LINE_MAX);
     const preferredAction = normalizePreferredAction(body.preferredAction);
     const publishedAt = body.publish ? new Date().toISOString() : undefined;
     const vibeTags = body.styleTags ?? body.vibeTags ?? [];
@@ -146,6 +153,7 @@ export function createApp(deps: AppDeps) {
         active: true,
         paused: false,
         displayName: botName,
+        vibeLine,
         publishedAt,
         preferredAction,
         roamStatus,
@@ -154,6 +162,7 @@ export function createApp(deps: AppDeps) {
       await store.updateBot(user.id, {
         vibeTags,
         displayName: botName,
+        vibeLine,
         publishedAt,
         preferredAction: body.preferredAction ? preferredAction : undefined,
         roamStatus,
@@ -169,6 +178,8 @@ export function createApp(deps: AppDeps) {
         dealbreakers: prefs.dealbreakers ?? [],
         lookingFor: intent,
         lookingForGender,
+        ageRangeMin: prefs.ageRangeMin,
+        ageRangeMax: prefs.ageRangeMax,
         interests: hobbies.length ? hobbies : prefs.interests ?? [],
       });
     } catch {
@@ -180,6 +191,8 @@ export function createApp(deps: AppDeps) {
         dealbreakers: prefs.dealbreakers ?? [],
         lookingFor: intent,
         lookingForGender,
+        ageRangeMin: prefs.ageRangeMin,
+        ageRangeMax: prefs.ageRangeMax,
         interests: hobbies.length ? hobbies : prefs.interests ?? [],
       });
     }
@@ -214,10 +227,18 @@ export function createApp(deps: AppDeps) {
         homeLat: body.homeGeo?.lat,
         homeLng: body.homeGeo?.lng,
         height: body.profile?.height !== undefined ? normalizeShortText(body.profile.height) : undefined,
+        heightCm:
+          body.profile?.heightCm !== undefined || body.profile?.height !== undefined
+            ? parseHeightCm(body.profile?.heightCm ?? body.profile?.height)
+            : undefined,
         hairColor:
-          body.profile?.hairColor !== undefined ? normalizeShortText(body.profile.hairColor) : undefined,
+          body.profile?.hair !== undefined || body.profile?.hairColor !== undefined
+            ? normalizeShortText(body.profile.hair ?? body.profile.hairColor)
+            : undefined,
         eyeColor:
-          body.profile?.eyeColor !== undefined ? normalizeShortText(body.profile.eyeColor) : undefined,
+          body.profile?.eyes !== undefined || body.profile?.eyeColor !== undefined
+            ? normalizeShortText(body.profile.eyes ?? body.profile.eyeColor)
+            : undefined,
         city: body.profile?.city !== undefined ? normalizeShortText(body.profile.city) : undefined,
         neighborhood:
           body.profile?.neighborhood !== undefined
@@ -253,6 +274,8 @@ export function createApp(deps: AppDeps) {
         dealbreakers: body.prefs?.dealbreakers,
         lookingFor: body.prefs?.intent ?? body.prefs?.lookingFor,
         lookingForGender,
+        ageRangeMin: body.prefs?.ageRangeMin,
+        ageRangeMax: body.prefs?.ageRangeMax,
         interests: hobbies ?? body.prefs?.interests,
       });
     }
@@ -283,7 +306,10 @@ export function createApp(deps: AppDeps) {
       paused,
       active: typeof body.active === "boolean" ? body.active : undefined,
       displayName:
-        body.displayName !== undefined ? normalizeShortText(body.displayName, BOT_NAME_MAX) : undefined,
+        body.botDisplayName !== undefined || body.displayName !== undefined
+          ? normalizeShortText(body.botDisplayName ?? body.displayName, BOT_NAME_MAX)
+          : undefined,
+      vibeLine: body.vibeLine !== undefined ? normalizeShortText(body.vibeLine, VIBE_LINE_MAX) : undefined,
       preferredAction,
       roamStatus: roamStatusFor({
         publishedAt: current.publishedAt,
@@ -300,7 +326,7 @@ export function createApp(deps: AppDeps) {
     const bot = await store.botForUser(userId);
     if (!bot) return c.json({ error: "not_found" }, 404);
     const body = (await c.req.json().catch(() => ({}))) as { preferredAction?: string };
-    const preferredAction = normalizePreferredAction(body.preferredAction);
+    const preferredAction = body.preferredAction ? normalizePreferredAction(body.preferredAction) : "roam";
     const publishedAt = bot.publishedAt ?? new Date().toISOString();
     await store.updateBot(userId, {
       preferredAction,

@@ -283,15 +283,24 @@ async function main() {
   const mayaProfile = await json<{
     photoUrl?: string;
     height?: string;
+    heightCm?: number;
     likes?: string[];
+    hair?: string;
     hairColor?: string;
+    eyes?: string;
     eyeColor?: string;
     city?: string;
     neighborhood?: string;
     hobbies?: string[];
     gender?: string;
     lookingForGender?: string;
-    prefs?: { intent?: string; lookingFor?: string; lookingForGender?: string };
+    prefs?: {
+      intent?: string;
+      lookingFor?: string;
+      lookingForGender?: string;
+      ageRangeMin?: number;
+      ageRangeMax?: number;
+    };
   }>(await app.request("/users/me", { headers: { cookie: mayaAuth.cookie } }));
   if (mayaProfile.photoUrl !== MAYA.photoUrl) failures.push("onboard did not persist photoUrl");
   else console.log("ok  onboard Maya + Jordan (User + DatingBot + photoUrl)");
@@ -313,9 +322,20 @@ async function main() {
   ) {
     failures.push(`onboard did not persist Spark gender/intent: ${JSON.stringify(mayaProfile)}`);
   } else console.log("ok  onboard persisted Spark gender / lookingForGender / intent");
+  if (
+    mayaProfile.heightCm !== 168 ||
+    mayaProfile.hair !== "dark brown" ||
+    mayaProfile.eyes !== "brown" ||
+    mayaProfile.prefs?.ageRangeMin !== 25 ||
+    mayaProfile.prefs?.ageRangeMax !== 40
+  ) {
+    failures.push(`onboard did not persist Spark heightCm/hair/eyes/ageRange: ${JSON.stringify(mayaProfile)}`);
+  } else console.log("ok  onboard persisted Spark heightCm / hair / eyes / age range");
 
   const mayaBot = await json<{
     displayName?: string;
+    botDisplayName?: string;
+    vibeLine?: string;
     publishedAt?: string;
     preferredAction?: string;
     roamStatus?: string;
@@ -325,6 +345,8 @@ async function main() {
     failures.push(`onboard bot name/publish missing: ${JSON.stringify(mayaBot)}`);
   } else if (mayaBot.roamStatus !== "paused" || !mayaBot.styleTags?.includes("Curious")) {
     failures.push(`onboard roamStatus/styleTags missing: ${JSON.stringify(mayaBot)}`);
+  } else if (mayaBot.botDisplayName !== "Ember" || mayaBot.vibeLine !== "Denver nights, italian food") {
+    failures.push(`onboard botDisplayName/vibeLine missing: ${JSON.stringify(mayaBot)}`);
   } else console.log("ok  Maya named bot Ember and published (wait / paused)");
 
   const leanAuth = await signUp(app, {

@@ -27,7 +27,7 @@ export default function CreateBotPage() {
         await getMe();
         const current = await getBot();
         setBot(current);
-        setBotName(current.displayName ?? "");
+        setBotName(current.botDisplayName ?? current.displayName ?? "");
         setStyleTags(current.styleTags?.length ? current.styleTags : current.vibeTags.length ? current.vibeTags : ["Curious"]);
         setPaused(current.paused || current.roamStatus === "paused");
         setMode("settings");

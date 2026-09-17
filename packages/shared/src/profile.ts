@@ -8,29 +8,36 @@ import type {
 } from "./types";
 
 /**
- * Spark + Edgar v1 dating profile. Product fields locked for this PR:
- * botName, bio, likes[], dislikes[], hobbies[], height, hairColor, eyeColor,
- * city/neighborhood, intent (was lookingFor), gender, lookingForGender,
- * photo, styleTags, dealbreakers, homeGeo, maxTravelMiles, cuisine, budget,
- * botDatingOptIn, roamStatus.
+ * Spark create-bot-flow-v1 + Edgar aliases. Persist exactly these:
+ * botDisplayName, vibeLine, photoUrl, heightCm, hair, eyes, styleTags,
+ * likes≥1, hobbies≥1, dislikes, dealbreakers, lookingFor/intent,
+ * gender, interestedIn/lookingForGender, age, ageRangeMin/Max, homeGeo,
+ * maxTravelMiles, cuisine, budget, botDatingOptIn, roamStatus.
  */
 export const V1_PROFILE_FIELDS = [
+  "botDisplayName",
   "botName",
+  "vibeLine",
   "bio",
   "likes",
   "dislikes",
   "hobbies",
   "height",
+  "heightCm",
+  "hair",
   "hairColor",
+  "eyes",
   "eyeColor",
   "city",
   "neighborhood",
   "intent",
+  "lookingFor",
   "gender",
   "lookingForGender",
 ] as const;
 
 export const BOT_NAME_MAX = 40;
+export const VIBE_LINE_MAX = 80;
 export const SHORT_TEXT_MAX = 40;
 export const BIO_MAX = 280;
 export const TAG_MAX = 12;
@@ -104,6 +111,21 @@ export function lookingForGenderFromInterestedIn(list: unknown): LookingForGende
 
 export function normalizeIntent(raw: unknown): Intent {
   return raw === "relationship" || raw === "casual" || raw === "unsure" ? raw : "unsure";
+}
+
+/** Spark stores height in cm; UI may type 5'7" or 170. */
+export function parseHeightCm(raw: unknown): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return Math.round(raw);
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  const ftin = trimmed.match(/^(\d+)\s*['’]\s*(\d+)/);
+  if (ftin) return Math.round(Number(ftin[1]) * 30.48 + Number(ftin[2]) * 2.54);
+  const cm = trimmed.match(/^(\d+(?:\.\d+)?)\s*cm$/i);
+  if (cm) return Math.round(Number(cm[1]));
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  if (n >= 120 && n <= 230) return Math.round(n);
+  return undefined;
 }
 
 export function roamStatusFor(bot: {

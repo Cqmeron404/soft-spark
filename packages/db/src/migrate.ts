@@ -60,6 +60,7 @@ const STATEMENTS = [
     bot_dating_opt_in BOOLEAN NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
     height TEXT,
+    height_cm INTEGER,
     hair_color TEXT,
     eye_color TEXT,
     city TEXT,
@@ -79,6 +80,7 @@ const STATEMENTS = [
     active BOOLEAN NOT NULL DEFAULT true,
     paused BOOLEAN NOT NULL DEFAULT false,
     display_name TEXT,
+    vibe_line TEXT,
     published_at TIMESTAMPTZ,
     preferred_action TEXT NOT NULL DEFAULT 'wait',
     roam_status TEXT,
@@ -93,6 +95,8 @@ const STATEMENTS = [
     dealbreakers TEXT[] NOT NULL,
     looking_for TEXT NOT NULL DEFAULT 'unsure',
     looking_for_gender TEXT,
+    age_range_min INTEGER,
+    age_range_max INTEGER,
     interests TEXT[] NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS "matches" (
@@ -179,6 +183,7 @@ const ALTERS = [
   `ALTER TABLE "invites" ADD COLUMN IF NOT EXISTS carry_cue_a TEXT`,
   `ALTER TABLE "invites" ADD COLUMN IF NOT EXISTS carry_cue_b TEXT`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS height TEXT`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS height_cm INTEGER`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS hair_color TEXT`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS likes TEXT[]`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS dislikes TEXT[]`,
@@ -189,10 +194,13 @@ const ALTERS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS job TEXT`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS education TEXT`,
   `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS display_name TEXT`,
+  `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS vibe_line TEXT`,
   `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ`,
   `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS preferred_action TEXT`,
   `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS roam_status TEXT`,
   `ALTER TABLE "preferences" ADD COLUMN IF NOT EXISTS looking_for_gender TEXT`,
+  `ALTER TABLE "preferences" ADD COLUMN IF NOT EXISTS age_range_min INTEGER`,
+  `ALTER TABLE "preferences" ADD COLUMN IF NOT EXISTS age_range_max INTEGER`,
 ];
 
 export async function applySchema(db: SparkDb): Promise<void> {

@@ -3,23 +3,27 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { BotDto, UserDto } from "@soft-spark/shared";
-import { AppLogo, TAGLINE } from "@soft-spark/ui";
-import { OnboardWizard } from "@/components/OnboardWizard";
+import { TAGLINE } from "@soft-spark/ui";
+import { WelcomeLanding } from "@/components/WelcomeLanding";
+import { getAuthSession } from "@/lib/auth";
 import { getBot, getMe } from "@/lib/api";
-import { ensureGuestSession } from "@/lib/guest-session";
 import { writeSession } from "@/lib/session";
 
 export default function Home() {
-  const [mode, setMode] = useState<"loading" | "create" | "home">("loading");
+  const [mode, setMode] = useState<"loading" | "welcome" | "home">("loading");
   const [me, setMe] = useState<UserDto | null>(null);
   const [bot, setBot] = useState<BotDto | null>(null);
 
   useEffect(() => {
     void (async () => {
-      try {
-        await ensureGuestSession();
-      } catch {
-        setMode("create");
+      const signedOut = new URLSearchParams(window.location.search).get("out") === "1";
+      if (signedOut) {
+        setMode("welcome");
+        return;
+      }
+      const session = await getAuthSession();
+      if (!session?.user) {
+        setMode("welcome");
         return;
       }
       try {
@@ -33,7 +37,7 @@ export default function Home() {
         }
         setMode("home");
       } catch {
-        setMode("create");
+        window.location.replace("/onboard");
       }
     })();
   }, []);
@@ -42,20 +46,17 @@ export default function Home() {
     return <p style={{ color: "var(--ss-text-muted)" }}>Catching up…</p>;
   }
 
-  if (mode === "create") {
-    return <OnboardWizard />;
+  if (mode === "welcome" || !me) {
+    return <WelcomeLanding />;
   }
 
-  if (!me) return <OnboardWizard />;
-
-  const botName = bot?.displayName?.trim() || `${me.displayName}'s bot`;
+  const botName = bot?.botDisplayName?.trim() || bot?.displayName?.trim() || `${me.displayName}'s bot`;
   const published = Boolean(bot?.publishedAt);
   const roaming = bot?.roamStatus === "roaming";
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
       <div style={{ display: "grid", gap: 8, justifyItems: "start" }}>
-        <AppLogo variant="mark" size={40} />
         <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 13, fontWeight: 600 }}>Home</p>
         <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 30, margin: 0 }}>
           Hey, {me.displayName}
@@ -65,21 +66,20 @@ export default function Home() {
         </p>
         <p style={{ margin: 0, color: "var(--ss-text-muted)", lineHeight: 1.45 }}>
           {roaming
-            ? `${botName} is out.`
+            ? `${botName} is roaming.`
             : published
-              ? `${botName} is published and waiting — roam when you want.`
+              ? `${botName} is paused.`
               : `Finish setup so ${botName} can go out.`}
         </p>
       </div>
       <div className="ss-card" style={{ display: "grid", gap: 10 }}>
         <p style={{ margin: 0, fontFamily: "var(--ss-font-display)", fontSize: 22 }}>{botName}</p>
         <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 14 }}>
-          {bot?.roamStatus === "roaming"
-            ? "Roaming"
-            : bot?.roamStatus === "paused"
-              ? "Paused"
-              : "Draft"}
+          {bot?.roamStatus === "roaming" ? "Roaming" : bot?.roamStatus === "paused" ? "Paused" : "Draft"}
         </p>
+        {bot?.vibeLine ? (
+          <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>{bot.vibeLine}</p>
+        ) : null}
         <div className="ss-chip-row">
           {(bot?.styleTags ?? bot?.vibeTags ?? []).map((tag) => (
             <span key={tag} className="ss-chip ss-chip-on">

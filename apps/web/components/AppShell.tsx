@@ -1,11 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { TabBar, TabVisual, type TabItem } from "@soft-spark/ui";
 import { PushOptIn } from "@/components/PushOptIn";
 import { SessionBar } from "@/components/SessionBar";
+import { SESSION_EVENT, readSession } from "@/lib/session";
 
 const TABS: Array<Omit<TabItem, "current">> = [
   { href: "/", label: "Home", icon: "home" },
@@ -20,7 +21,19 @@ function isAuthPath(pathname: string) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const hideTabs = isAuthPath(pathname);
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    function refresh() {
+      setSignedIn(Boolean(readSession()));
+    }
+    refresh();
+    window.addEventListener(SESSION_EVENT, refresh);
+    return () => window.removeEventListener(SESSION_EVENT, refresh);
+  }, [pathname]);
+
+  const welcomeLanding = pathname === "/" && !signedIn;
+  const hideTabs = isAuthPath(pathname) || welcomeLanding;
 
   return (
     <div className="ss-app-stage">

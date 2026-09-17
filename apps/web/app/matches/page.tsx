@@ -37,7 +37,7 @@ export default function MatchesPage() {
       setItems(await listMatches());
       try {
         const bot = await getBot();
-        setBotName(bot.displayName ?? "Your bot");
+        setBotName(bot.botDisplayName ?? bot.displayName ?? "Your bot");
       } catch {
         router.replace("/onboard");
       }
@@ -73,9 +73,7 @@ export default function MatchesPage() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {showSearch ? null : (
-        <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>Your bot is out</h1>
-      )}
+      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>Your bots are out</h1>
       <ConnectingCaption live={live} />
       {toast ? (
         <SoftToast

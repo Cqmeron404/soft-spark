@@ -172,7 +172,7 @@
 .ss-phone {
   width: min(390px, 100%);
   height: min(844px, calc(100dvh - 24px));
-  background: var(--ss-surface);
+  background: var(--ss-bg);
   border-radius: var(--ss-radius-phone);
   border: 1px solid var(--ss-border);
   box-shadow:
@@ -191,7 +191,7 @@
   padding: 10px 16px 8px;
   border-bottom: 1px solid var(--ss-border);
   min-height: 52px;
-  background: var(--ss-surface);
+  background: var(--ss-bg);
 }
 
 .ss-phone-body {

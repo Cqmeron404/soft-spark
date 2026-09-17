@@ -57,8 +57,7 @@ export function SessionBar() {
                 void signOut()
                   .catch(() => undefined)
                   .finally(() => {
-                    // Must change the path — assign("/") is a no-op on Home.
-                    window.location.assign("/onboard?new=1");
+                    window.location.assign("/?out=1");
                   });
               }}
             >
