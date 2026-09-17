@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { TabBar, TabVisual, type TabItem } from "@soft-spark/ui";
+import { TabVisual, type TabItem } from "@soft-spark/ui";
 import { PushOptIn } from "@/components/PushOptIn";
 import { SessionBar } from "@/components/SessionBar";
 import { SESSION_EVENT, readSession } from "@/lib/session";
@@ -19,7 +19,7 @@ function isAuthPath(pathname: string) {
   return pathname.startsWith("/auth/") || pathname === "/signin" || pathname === "/signup";
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [signedIn, setSignedIn] = useState(false);
 
@@ -43,22 +43,24 @@ export function AppShell({ children }: { children: ReactNode }) {
           <PushOptIn />
         </main>
         {hideTabs ? null : (
-          <TabBar
-            items={TABS.map((tab) => ({
-              ...tab,
-              current: tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href),
-            }))}
-            renderLink={(item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="ss-tab"
-                aria-current={item.current ? "page" : undefined}
-              >
-                <TabVisual item={item} />
-              </Link>
-            )}
-          />
+          <nav className="ss-tabbar" aria-label="App">
+            {TABS.map((tab) => {
+              const item = {
+                ...tab,
+                current: tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href),
+              };
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="ss-tab"
+                  aria-current={item.current ? "page" : undefined}
+                >
+                  <TabVisual item={item} />
+                </Link>
+              );
+            })}
+          </nav>
         )}
       </div>
     </div>

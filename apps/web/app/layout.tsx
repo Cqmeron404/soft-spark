@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import "@soft-spark/ui/tokens.css";
@@ -35,7 +34,7 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: ReactNode;
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="en">
