@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveGuestAuth } from "./guest-auth";
-import { ROAM_HREF, tabIsCurrent, tabPath } from "./nav";
+import { resolveGuestAuth } from "./guest-auth.ts";
+import { ROAM_HREF, tabIsCurrent, tabPath } from "./nav.ts";
 
 test("ensureGuest keeps a Bearer session instead of minting a new guest", () => {
   const kept = resolveGuestAuth({
