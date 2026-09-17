@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ClientRealtimeEvent, MatchListItem } from "@soft-spark/shared";
-import { ConnectingCaption, MatchCard, SoftToast } from "@soft-spark/ui";
+import { ConnectingCaption, EmptyState, MatchCard, SoftToast } from "@soft-spark/ui";
 import { BotSearchAction } from "@/components/BotSearchAction";
-import { listMatches } from "@/lib/api";
+import { getBot, listMatches } from "@/lib/api";
+import { ensureGuestSession } from "@/lib/guest-session";
 import { useMatchRealtime } from "@/lib/realtime";
 import { readSession } from "@/lib/session";
 
@@ -17,20 +18,32 @@ export default function MatchesPage() {
   const router = useRouter();
   const [autoRoam, setAutoRoam] = useState(false);
   const [items, setItems] = useState<MatchListItem[] | null>(null);
+  const [botName, setBotName] = useState("Your bot");
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ matchId: string } | null>(null);
 
   async function load() {
-    const session = readSession();
-    if (!session) {
-      router.replace("/auth/sign-in");
+    try {
+      await ensureGuestSession();
+    } catch {
+      router.replace("/");
+      return;
+    }
+    if (!readSession()) {
+      router.replace("/");
       return;
     }
     try {
       setItems(await listMatches());
+      try {
+        const bot = await getBot();
+        setBotName(bot.displayName ?? "Your bot");
+      } catch {
+        router.replace("/onboard");
+      }
     } catch (err) {
       const status = (err as { status?: number }).status;
-      if (status === 401) router.replace("/auth/sign-in");
+      if (status === 401) router.replace("/");
       else if (status === 404) router.replace("/onboard");
       else setError(err instanceof Error ? err.message : "Failed to load");
     }
@@ -60,10 +73,7 @@ export default function MatchesPage() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 13, fontWeight: 600 }}>Roam</p>
-      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>
-        Your bots are out
-      </h1>
+      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>Your bot is out</h1>
       <ConnectingCaption live={live} />
       {toast ? (
         <SoftToast
@@ -74,7 +84,10 @@ export default function MatchesPage() {
         />
       ) : null}
       {error ? <p className="ss-error">{error === "unauthorized" ? "Sign in to keep your bot dating" : error}</p> : null}
-      {showSearch ? <BotSearchAction autoStart={autoRoam} /> : null}
+      {showSearch ? <BotSearchAction autoStart={autoRoam} botName={botName} /> : null}
+      {!showSearch && items !== null && liveItems.length === 0 ? (
+        <EmptyState title="No active matches yet — your bot’s exploring" />
+      ) : null}
       <div style={{ display: "grid", gap: 12 }}>
         {items?.map((m) => (
           <MatchCard

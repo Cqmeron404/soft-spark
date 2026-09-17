@@ -81,6 +81,7 @@ const STATEMENTS = [
     display_name TEXT,
     published_at TIMESTAMPTZ,
     preferred_action TEXT NOT NULL DEFAULT 'wait',
+    roam_status TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
   `CREATE TABLE IF NOT EXISTS "preferences" (
@@ -91,6 +92,7 @@ const STATEMENTS = [
     max_travel_km INTEGER NOT NULL,
     dealbreakers TEXT[] NOT NULL,
     looking_for TEXT NOT NULL DEFAULT 'unsure',
+    looking_for_gender TEXT,
     interests TEXT[] NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS "matches" (
@@ -189,6 +191,8 @@ const ALTERS = [
   `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS display_name TEXT`,
   `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ`,
   `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS preferred_action TEXT`,
+  `ALTER TABLE "dating_bots" ADD COLUMN IF NOT EXISTS roam_status TEXT`,
+  `ALTER TABLE "preferences" ADD COLUMN IF NOT EXISTS looking_for_gender TEXT`,
 ];
 
 export async function applySchema(db: SparkDb): Promise<void> {

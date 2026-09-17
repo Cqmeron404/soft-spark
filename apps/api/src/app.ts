@@ -2,14 +2,21 @@ import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { SparkDb } from "@soft-spark/db";
-import type { LookingFor, OnboardBody, PriceTier } from "@soft-spark/shared";
+import type { OnboardBody, PriceTier } from "@soft-spark/shared";
 import {
   BIO_MAX,
   BOT_NAME_MAX,
   geoForPlace,
+  interestedInFromLookingForGender,
+  lookingForGenderFromInterestedIn,
+  milesToKm,
+  normalizeGender,
+  normalizeIntent,
+  normalizeLookingForGender,
   normalizePreferredAction,
   normalizeShortText,
   normalizeTagList,
+  roamStatusFor,
 } from "@soft-spark/shared";
 import type { Auth } from "./auth.js";
 import { authMode, resolveSession } from "./auth.js";
@@ -80,8 +87,11 @@ export function createApp(deps: AppDeps) {
     if (!profile?.displayName || !profile.age || !profile.gender) {
       return c.json({ error: "profile.displayName, age, gender required" }, 400);
     }
-    if (!prefs?.cuisine?.length || !prefs.maxTravelKm || !prefs.budget) {
-      return c.json({ error: "prefs cuisine, budget, maxTravelKm required" }, 400);
+    const maxTravelKm =
+      prefs?.maxTravelKm ??
+      (typeof prefs?.maxTravelMiles === "number" ? milesToKm(prefs.maxTravelMiles) : 0);
+    if (!prefs?.cuisine?.length || !maxTravelKm || !prefs.budget) {
+      return c.json({ error: "prefs cuisine, budget, and travel distance required" }, 400);
     }
     if (!body.homeGeo && !profile.city) return c.json({ error: "homeGeo or profile.city required" }, 400);
 
@@ -90,11 +100,17 @@ export function createApp(deps: AppDeps) {
     const existing = await store.userByAuthId(authId);
     const hobbies = normalizeTagList(profile.hobbies ?? prefs.interests);
     const place = geoForPlace(profile.city, profile.neighborhood);
+    const lookingForGender =
+      normalizeLookingForGender(prefs.lookingForGender ?? profile.lookingForGender) ??
+      lookingForGenderFromInterestedIn(profile.interestedIn);
+    const gender = normalizeGender(profile.gender) ?? profile.gender;
+    const intent = normalizeIntent(prefs.intent ?? prefs.lookingFor);
     const profilePatch = {
       displayName: profile.displayName,
       age: profile.age,
-      gender: profile.gender,
-      interestedIn: profile.interestedIn ?? [],
+      gender,
+      interestedIn:
+        profile.interestedIn?.length ? profile.interestedIn : interestedInFromLookingForGender(lookingForGender),
       bio: normalizeShortText(profile.bio, BIO_MAX),
       photoUrl: body.photoUrl,
       homeLat: body.homeGeo?.lat ?? place.lat,
@@ -112,6 +128,8 @@ export function createApp(deps: AppDeps) {
     const botName = normalizeShortText(body.botName, BOT_NAME_MAX);
     const preferredAction = normalizePreferredAction(body.preferredAction);
     const publishedAt = body.publish ? new Date().toISOString() : undefined;
+    const vibeTags = body.styleTags ?? body.vibeTags ?? [];
+    const roamStatus = roamStatusFor({ publishedAt, preferredAction, paused: false });
     const user = existing
       ? await store.updateUser(existing.id, profilePatch)
       : await store.createUser({
@@ -124,19 +142,21 @@ export function createApp(deps: AppDeps) {
     if (!(await store.botForUser(user.id))) {
       await store.createBot({
         userId: user.id,
-        vibeTags: body.vibeTags ?? [],
+        vibeTags,
         active: true,
         paused: false,
         displayName: botName,
         publishedAt,
         preferredAction,
+        roamStatus,
       });
     } else {
       await store.updateBot(user.id, {
-        vibeTags: body.vibeTags,
+        vibeTags,
         displayName: botName,
         publishedAt,
         preferredAction: body.preferredAction ? preferredAction : undefined,
+        roamStatus,
       });
     }
 
@@ -145,9 +165,10 @@ export function createApp(deps: AppDeps) {
       await store.updatePrefs(user.id, {
         cuisine: prefs.cuisine,
         budget: prefs.budget as PriceTier,
-        maxTravelKm: prefs.maxTravelKm,
+        maxTravelKm,
         dealbreakers: prefs.dealbreakers ?? [],
-        lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
+        lookingFor: intent,
+        lookingForGender,
         interests: hobbies.length ? hobbies : prefs.interests ?? [],
       });
     } catch {
@@ -155,9 +176,10 @@ export function createApp(deps: AppDeps) {
         userId: user.id,
         cuisine: prefs.cuisine,
         budget: prefs.budget as PriceTier,
-        maxTravelKm: prefs.maxTravelKm,
+        maxTravelKm,
         dealbreakers: prefs.dealbreakers ?? [],
-        lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
+        lookingFor: intent,
+        lookingForGender,
         interests: hobbies.length ? hobbies : prefs.interests ?? [],
       });
     }
@@ -185,7 +207,7 @@ export function createApp(deps: AppDeps) {
       await store.updateUser(userId, {
         displayName: body.profile?.displayName,
         age: body.profile?.age,
-        gender: body.profile?.gender,
+        gender: body.profile?.gender ? normalizeGender(body.profile.gender) ?? body.profile.gender : undefined,
         interestedIn: body.profile?.interestedIn,
         bio: body.profile?.bio !== undefined ? normalizeShortText(body.profile.bio, BIO_MAX) : undefined,
         photoUrl: body.photoUrl ?? body.profile?.photoUrl,
@@ -210,15 +232,27 @@ export function createApp(deps: AppDeps) {
       const place = geoForPlace(body.profile.city, body.profile.neighborhood);
       await store.updateUser(userId, { homeLat: place.lat, homeLng: place.lng });
     }
-    if (body.prefs || body.profile?.hobbies) {
+    if (body.prefs || body.profile?.hobbies || body.profile?.lookingForGender) {
       const hobbies =
         body.profile?.hobbies !== undefined ? normalizeTagList(body.profile.hobbies) : undefined;
+      const lookingForGender =
+        normalizeLookingForGender(body.prefs?.lookingForGender ?? body.profile?.lookingForGender) ??
+        (body.profile?.interestedIn ? lookingForGenderFromInterestedIn(body.profile.interestedIn) : undefined);
+      const maxTravelKm =
+        body.prefs?.maxTravelKm ??
+        (typeof body.prefs?.maxTravelMiles === "number" ? milesToKm(body.prefs.maxTravelMiles) : undefined);
+      if (lookingForGender && !body.profile?.interestedIn) {
+        await store.updateUser(userId, {
+          interestedIn: interestedInFromLookingForGender(lookingForGender),
+        });
+      }
       await store.updatePrefs(userId, {
         cuisine: body.prefs?.cuisine,
         budget: body.prefs?.budget,
-        maxTravelKm: body.prefs?.maxTravelKm,
+        maxTravelKm,
         dealbreakers: body.prefs?.dealbreakers,
-        lookingFor: body.prefs?.lookingFor,
+        lookingFor: body.prefs?.intent ?? body.prefs?.lookingFor,
+        lookingForGender,
         interests: hobbies ?? body.prefs?.interests,
       });
     }
@@ -237,13 +271,25 @@ export function createApp(deps: AppDeps) {
     const bot = await store.botForUser(userId);
     if (!bot) return c.json({ error: "not_found" }, 404);
     const body = await c.req.json();
-    const payload = await store.updateBot(userId, {
-      vibeTags: Array.isArray(body.vibeTags) ? body.vibeTags : undefined,
-      paused: typeof body.paused === "boolean" ? body.paused : undefined,
+    const paused = typeof body.paused === "boolean" ? body.paused : undefined;
+    const preferredAction = body.preferredAction ? normalizePreferredAction(body.preferredAction) : undefined;
+    const current = await toBotDto(store, userId);
+    await store.updateBot(userId, {
+      vibeTags: Array.isArray(body.styleTags)
+        ? body.styleTags
+        : Array.isArray(body.vibeTags)
+          ? body.vibeTags
+          : undefined,
+      paused,
       active: typeof body.active === "boolean" ? body.active : undefined,
       displayName:
         body.displayName !== undefined ? normalizeShortText(body.displayName, BOT_NAME_MAX) : undefined,
-      preferredAction: body.preferredAction ? normalizePreferredAction(body.preferredAction) : undefined,
+      preferredAction,
+      roamStatus: roamStatusFor({
+        publishedAt: current.publishedAt,
+        paused: paused ?? current.paused,
+        preferredAction: preferredAction ?? current.preferredAction,
+      }),
     });
     return c.json(await toBotDto(store, userId));
   });
@@ -255,10 +301,13 @@ export function createApp(deps: AppDeps) {
     if (!bot) return c.json({ error: "not_found" }, 404);
     const body = (await c.req.json().catch(() => ({}))) as { preferredAction?: string };
     const preferredAction = normalizePreferredAction(body.preferredAction);
+    const publishedAt = bot.publishedAt ?? new Date().toISOString();
     await store.updateBot(userId, {
       preferredAction,
-      publishedAt: bot.publishedAt ?? new Date().toISOString(),
+      publishedAt,
       active: true,
+      paused: preferredAction === "wait",
+      roamStatus: roamStatusFor({ publishedAt, preferredAction, paused: preferredAction === "wait" }),
     });
     const payload = await toBotDto(store, userId);
     assertClientSafe(payload);

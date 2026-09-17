@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { DEMO_ACCOUNTS } from "@soft-spark/shared";
 import { getMe } from "@/lib/api";
 import { signInEmail } from "@/lib/auth";
@@ -38,18 +39,24 @@ export function DemoSignInButtons(props: {
   }
 
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      <button type="button" className="ss-btn ss-btn-ghost" disabled={props.busy} onClick={() => void run(DEMO_ACCOUNTS.maya)}>
-        Maya demo
+    <div className="ss-try-as">
+      <button type="button" disabled={props.busy} onClick={() => void run(DEMO_ACCOUNTS.maya)}>
+        try as Maya
       </button>
-      <button
-        type="button"
-        className="ss-btn ss-btn-ghost"
-        disabled={props.busy}
-        onClick={() => void run(DEMO_ACCOUNTS.jordan)}
-      >
-        Jordan demo
+      <button type="button" disabled={props.busy} onClick={() => void run(DEMO_ACCOUNTS.jordan)}>
+        try as Jordan
       </button>
     </div>
+  );
+}
+
+export function QuietDemoLinks() {
+  const [busy, setBusy] = useState(false);
+  return (
+    <DemoSignInButtons
+      busy={busy}
+      onBusy={setBusy}
+      then={(path) => window.location.assign(path)}
+    />
   );
 }

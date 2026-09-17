@@ -1,6 +1,19 @@
-import type { PreferredAction } from "./types";
+import type {
+  Intent,
+  LookingFor,
+  LookingForGender,
+  PreferredAction,
+  ProfileGender,
+  RoamStatus,
+} from "./types";
 
-/** Edgar-locked v1 dating profile. Do not add product fields without a new lock. */
+/**
+ * Spark + Edgar v1 dating profile. Product fields locked for this PR:
+ * botName, bio, likes[], dislikes[], hobbies[], height, hairColor, eyeColor,
+ * city/neighborhood, intent (was lookingFor), gender, lookingForGender,
+ * photo, styleTags, dealbreakers, homeGeo, maxTravelMiles, cuisine, budget,
+ * botDatingOptIn, roamStatus.
+ */
 export const V1_PROFILE_FIELDS = [
   "botName",
   "bio",
@@ -12,7 +25,9 @@ export const V1_PROFILE_FIELDS = [
   "eyeColor",
   "city",
   "neighborhood",
-  "lookingFor",
+  "intent",
+  "gender",
+  "lookingForGender",
 ] as const;
 
 export const BOT_NAME_MAX = 40;
@@ -50,13 +65,85 @@ export function normalizePreferredAction(raw: unknown): PreferredAction {
   return raw === "roam" ? "roam" : "wait";
 }
 
+export function normalizeGender(raw: unknown): ProfileGender | undefined {
+  if (typeof raw !== "string") return undefined;
+  const value = raw.trim().toLowerCase();
+  if (value === "male" || value === "man") return "male";
+  if (value === "female" || value === "woman") return "female";
+  return undefined;
+}
+
+export function canonGender(raw: string): string {
+  return normalizeGender(raw) ?? raw.trim().toLowerCase();
+}
+
+export function normalizeLookingForGender(raw: unknown): LookingForGender | undefined {
+  if (typeof raw !== "string") return undefined;
+  const value = raw.trim().toLowerCase();
+  if (value === "male" || value === "man") return "male";
+  if (value === "female" || value === "woman") return "female";
+  if (value === "both" || value === "any" || value === "everyone") return "both";
+  return undefined;
+}
+
+export function interestedInFromLookingForGender(lookingForGender: LookingForGender): string[] {
+  return lookingForGender === "both" ? ["male", "female"] : [lookingForGender];
+}
+
+export function lookingForGenderFromInterestedIn(list: unknown): LookingForGender {
+  if (!Array.isArray(list)) return "male";
+  const set = new Set(
+    list
+      .map((item) => (typeof item === "string" ? normalizeGender(item) : undefined))
+      .filter((item): item is ProfileGender => Boolean(item))
+  );
+  if (set.has("male") && set.has("female")) return "both";
+  if (set.has("female") && !set.has("male")) return "female";
+  return "male";
+}
+
+export function normalizeIntent(raw: unknown): Intent {
+  return raw === "relationship" || raw === "casual" || raw === "unsure" ? raw : "unsure";
+}
+
+export function roamStatusFor(bot: {
+  publishedAt?: string;
+  paused?: boolean;
+  preferredAction?: PreferredAction | string;
+}): RoamStatus {
+  if (!bot.publishedAt) return "draft";
+  if (bot.paused || bot.preferredAction !== "roam") return "paused";
+  return "roaming";
+}
+
 export const PROFILE_CHIP_PRESETS = {
   likes: ["pasta", "live music", "late walks", "coffee", "dogs", "travel", "cooking", "movies"],
   dislikes: ["cigarettes", "ghosting", "tardiness", "loud bars"],
   hobbies: ["hiking", "food", "design", "live music", "running", "reading", "climbing"],
   hairColor: ["black", "brown", "dark brown", "blonde", "red", "auburn", "gray"],
   eyeColor: ["brown", "hazel", "blue", "green", "gray"],
+  styleTags: ["Curious", "Bold", "Soft", "Witty", "Warm", "Playful"],
+  cuisine: ["italian", "american", "mexican", "thai", "sushi"],
 } as const;
+
+export const GENDER_OPTIONS: Array<{ id: ProfileGender; label: string }> = [
+  { id: "female", label: "Female" },
+  { id: "male", label: "Male" },
+];
+
+export const LOOKING_FOR_GENDER_OPTIONS: Array<{ id: LookingForGender; label: string }> = [
+  { id: "female", label: "Women" },
+  { id: "male", label: "Men" },
+  { id: "both", label: "Both" },
+];
+
+export const INTENT_OPTIONS: Array<{ id: LookingFor; label: string }> = [
+  { id: "relationship", label: "Relationship" },
+  { id: "casual", label: "Casual" },
+  { id: "unsure", label: "Unsure" },
+];
+
+export const TRAVEL_MILE_OPTIONS = [5, 10, 15, 25] as const;
 
 /** Hidden matching geo for v1 city/neighborhood (no Places). */
 export const CITY_NEIGHBORHOODS = [

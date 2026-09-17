@@ -1,26 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import type { UserDto } from "@soft-spark/shared";
-import { PROFILE_CHIP_PRESETS } from "@soft-spark/shared";
+import type { LookingForGender, ProfileGender, UserDto } from "@soft-spark/shared";
+import {
+  GENDER_OPTIONS,
+  INTENT_OPTIONS,
+  LOOKING_FOR_GENDER_OPTIONS,
+  PROFILE_CHIP_PRESETS,
+} from "@soft-spark/shared";
 import { PhotoCrop, SoftError } from "@soft-spark/ui";
 import { ChipField } from "@/components/ChipField";
+import { OnboardWizard } from "@/components/OnboardWizard";
 import { PublishActions } from "@/components/PublishActions";
 import { getBot, getMe, patchMe } from "@/lib/api";
-import { getAuthSession } from "@/lib/auth";
-import { CITY_NEIGHBORHOODS, GENDER_OPTIONS, LOOKING_OPTIONS } from "@/lib/guest";
+import { CITY_NEIGHBORHOODS } from "@/lib/guest";
+import { ensureGuestSession } from "@/lib/guest-session";
 import { writeSession } from "@/lib/session";
 
 export default function ProfilePage() {
-  const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [published, setPublished] = useState(true);
   const [botName, setBotName] = useState("your bot");
   const [displayName, setDisplayName] = useState("");
   const [age, setAge] = useState("29");
-  const [gender, setGender] = useState("woman");
-  const [interestedIn, setInterestedIn] = useState("man");
+  const [gender, setGender] = useState<ProfileGender>("female");
+  const [lookingForGender, setLookingForGender] = useState<LookingForGender>("male");
   const [bio, setBio] = useState("");
   const [height, setHeight] = useState("");
   const [hairColor, setHairColor] = useState("");
@@ -30,7 +35,7 @@ export default function ProfilePage() {
   const [likes, setLikes] = useState<string[]>([]);
   const [dislikes, setDislikes] = useState<string[]>([]);
   const [hobbies, setHobbies] = useState<string[]>([]);
-  const [lookingFor, setLookingFor] = useState("relationship");
+  const [intent, setIntent] = useState("relationship");
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,8 +44,8 @@ export default function ProfilePage() {
   function apply(user: UserDto) {
     setDisplayName(user.displayName);
     setAge(String(user.age));
-    setGender(user.gender);
-    setInterestedIn(user.interestedIn[0] ?? "man");
+    setGender((user.gender === "male" ? "male" : "female") as ProfileGender);
+    setLookingForGender(user.lookingForGender ?? user.prefs.lookingForGender ?? "male");
     setBio(user.bio ?? "");
     setHeight(user.height ?? "");
     setHairColor(user.hairColor ?? "");
@@ -50,18 +55,14 @@ export default function ProfilePage() {
     setLikes(user.likes ?? []);
     setDislikes(user.dislikes ?? []);
     setHobbies(user.hobbies.length ? user.hobbies : user.prefs.interests ?? []);
-    setLookingFor(user.prefs.lookingFor || "relationship");
+    setIntent(user.prefs.intent || user.prefs.lookingFor || "relationship");
     setPhotoUrl(user.photoUrl);
   }
 
   useEffect(() => {
     void (async () => {
-      const session = await getAuthSession();
-      if (!session?.user) {
-        router.replace("/auth/sign-in");
-        return;
-      }
       try {
+        await ensureGuestSession();
         const user = await getMe();
         apply(user);
         writeSession({ id: user.id, displayName: user.displayName });
@@ -74,10 +75,11 @@ export default function ProfilePage() {
         }
         setReady(true);
       } catch {
-        router.replace("/onboard");
+        setMissing(true);
+        setReady(true);
       }
     })();
-  }, [router]);
+  }, []);
 
   async function save() {
     setError(null);
@@ -90,7 +92,8 @@ export default function ProfilePage() {
           displayName: displayName.trim(),
           age: Number(age),
           gender,
-          interestedIn: [interestedIn],
+          lookingForGender,
+          interestedIn: lookingForGender === "both" ? ["male", "female"] : [lookingForGender],
           bio,
           height,
           hairColor,
@@ -101,7 +104,7 @@ export default function ProfilePage() {
           dislikes,
           hobbies,
         },
-        prefs: { lookingFor, interests: hobbies },
+        prefs: { intent, lookingFor: intent, lookingForGender, interests: hobbies },
       });
       apply(user);
       writeSession({ id: user.id, displayName: user.displayName });
@@ -114,6 +117,7 @@ export default function ProfilePage() {
   }
 
   if (!ready) return <p>Catching up…</p>;
+  if (missing) return <OnboardWizard />;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -129,27 +133,11 @@ export default function ProfilePage() {
         <input value={age} onChange={(e) => setAge(e.target.value)} inputMode="numeric" />
       </label>
       <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 8 }}>
-        <legend style={{ fontWeight: 600 }}>I am</legend>
+        <legend style={{ fontWeight: 600 }}>Gender</legend>
         <div className="ss-chip-row">
           {GENDER_OPTIONS.map((g) => (
-            <button key={g} type="button" className="ss-chip" aria-pressed={gender === g} onClick={() => setGender(g)}>
-              {g}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-      <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 8 }}>
-        <legend style={{ fontWeight: 600 }}>Interested in</legend>
-        <div className="ss-chip-row">
-          {GENDER_OPTIONS.map((g) => (
-            <button
-              key={g}
-              type="button"
-              className="ss-chip"
-              aria-pressed={interestedIn === g}
-              onClick={() => setInterestedIn(g)}
-            >
-              {g}
+            <button key={g.id} type="button" className="ss-chip" aria-pressed={gender === g.id} onClick={() => setGender(g.id)}>
+              {g.label}
             </button>
           ))}
         </div>
@@ -157,13 +145,29 @@ export default function ProfilePage() {
       <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 8 }}>
         <legend style={{ fontWeight: 600 }}>Looking for</legend>
         <div className="ss-chip-row">
-          {LOOKING_OPTIONS.map((opt) => (
+          {LOOKING_FOR_GENDER_OPTIONS.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              className="ss-chip"
+              aria-pressed={lookingForGender === g.id}
+              onClick={() => setLookingForGender(g.id)}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 8 }}>
+        <legend style={{ fontWeight: 600 }}>Intent</legend>
+        <div className="ss-chip-row">
+          {INTENT_OPTIONS.map((opt) => (
             <button
               key={opt.id}
               type="button"
               className="ss-chip"
-              aria-pressed={lookingFor === opt.id}
-              onClick={() => setLookingFor(opt.id)}
+              aria-pressed={intent === opt.id}
+              onClick={() => setIntent(opt.id)}
             >
               {opt.label}
             </button>

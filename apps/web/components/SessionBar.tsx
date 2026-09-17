@@ -28,7 +28,6 @@ export function SessionBar() {
     <header className="ss-phone-header">
       <BrandMark href={homeHref} />
       <nav style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--ss-text-muted)" }}>
-        {!authPage && !current ? <Link href="/auth/sign-in">Sign in</Link> : null}
         {current ? (
           <>
             <span
@@ -56,14 +55,18 @@ export function SessionBar() {
                   await signOut();
                 } finally {
                   clearSession();
-                  window.location.assign("/auth/sign-in");
+                  window.location.assign("/");
                 }
               }}
             >
               Sign out
             </button>
           </>
-        ) : null}
+        ) : (
+          <Link href="/auth/sign-in" style={{ fontSize: 13, color: "var(--ss-text-muted)" }}>
+            Sign in
+          </Link>
+        )}
       </nav>
     </header>
   );

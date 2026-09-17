@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { MatchDetail } from "@soft-spark/shared";
+import type { LookingForGender, MatchDetail, ProfileGender } from "@soft-spark/shared";
 import { BOT_SEARCH_ETA } from "@soft-spark/shared";
-import { BotSearchCard, type BotSearchPhase } from "@soft-spark/ui";
-import { searchForDate } from "@/lib/api";
+import { SearchVizPanel, type SearchVizPhase } from "@soft-spark/ui";
+import { getMe, searchForDate } from "@/lib/api";
 
 const MIN_SEARCH_MS = BOT_SEARCH_ETA.typicalSeconds * 1000;
 
@@ -16,13 +16,24 @@ export function matchHref(match: MatchDetail): string {
   return "/matches";
 }
 
-export function BotSearchAction(props: { autoStart?: boolean }) {
+export function BotSearchAction(props: { autoStart?: boolean; botName?: string }) {
   const router = useRouter();
-  const [phase, setPhase] = useState<BotSearchPhase>("idle");
+  const [phase, setPhase] = useState<SearchVizPhase>("idle");
   const [remaining, setRemaining] = useState<number>(BOT_SEARCH_ETA.typicalSeconds);
   const [error, setError] = useState<string | null>(null);
+  const [lookingForGender, setLookingForGender] = useState<LookingForGender>("both");
+  const [youGender, setYouGender] = useState<ProfileGender | string>("female");
   const timer = useRef<number | null>(null);
   const autoStarted = useRef(false);
+
+  useEffect(() => {
+    void getMe()
+      .then((me) => {
+        setLookingForGender(me.lookingForGender ?? me.prefs.lookingForGender ?? "both");
+        setYouGender(me.gender);
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -62,7 +73,7 @@ export function BotSearchAction(props: { autoStart?: boolean }) {
     } catch (err) {
       const status = (err as { status?: number }).status;
       if (status === 401) {
-        router.replace("/auth/sign-in");
+        router.replace("/");
         return;
       }
       setPhase("empty");
@@ -74,12 +85,16 @@ export function BotSearchAction(props: { autoStart?: boolean }) {
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <BotSearchCard
+      <SearchVizPanel
         phase={phase}
+        lookingForGender={lookingForGender}
+        youGender={youGender}
         etaSeconds={BOT_SEARCH_ETA.typicalSeconds}
         remainingSeconds={remaining}
         disabled={phase === "searching"}
         onSearch={() => void run()}
+        botName={props.botName}
+        band={phase === "found" ? "invite_ready" : phase === "searching" ? "building" : "low"}
       />
       {error ? <p className="ss-error">{error}</p> : null}
     </div>

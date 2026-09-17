@@ -1,5 +1,12 @@
 import type { BotDto, MatchDetail, MatchListItem, UserDto } from "@soft-spark/shared";
-import { isHomeCardReason } from "@soft-spark/shared";
+import {
+  isHomeCardReason,
+  kmToMiles,
+  lookingForGenderFromInterestedIn,
+  normalizeGender,
+  normalizeIntent,
+  roamStatusFor,
+} from "@soft-spark/shared";
 import type { SparkStore } from "./store.js";
 
 export async function toUserDto(store: SparkStore, userId: string): Promise<UserDto> {
@@ -10,7 +17,10 @@ export async function toUserDto(store: SparkStore, userId: string): Promise<User
     id: user.id,
     displayName: user.displayName,
     age: user.age,
-    gender: user.gender,
+    gender: normalizeGender(user.gender) ?? user.gender,
+    lookingForGender:
+      prefs.lookingForGender ??
+      lookingForGenderFromInterestedIn(user.interestedIn),
     interestedIn: user.interestedIn,
     bio: user.bio,
     photoUrl: user.photoUrl,
@@ -22,14 +32,19 @@ export async function toUserDto(store: SparkStore, userId: string): Promise<User
     likes: user.likes ?? [],
     dislikes: user.dislikes ?? [],
     hobbies: user.hobbies.length ? user.hobbies : prefs.interests ?? [],
+    botDatingOptIn: user.botDatingOptIn,
     homeGeo: { lat: user.homeLat, lng: user.homeLng },
     homeTz: user.homeTz,
     prefs: {
       cuisine: prefs.cuisine,
       budget: prefs.budget,
       maxTravelKm: prefs.maxTravelKm,
+      maxTravelMiles: kmToMiles(prefs.maxTravelKm),
       dealbreakers: prefs.dealbreakers,
+      intent: normalizeIntent(prefs.lookingFor),
       lookingFor: prefs.lookingFor,
+      lookingForGender:
+        prefs.lookingForGender ?? lookingForGenderFromInterestedIn(user.interestedIn),
       interests: prefs.interests,
     },
   };
@@ -41,11 +56,13 @@ export async function toBotDto(store: SparkStore, userId: string): Promise<BotDt
   return {
     id: bot.id,
     vibeTags: bot.vibeTags,
+    styleTags: bot.vibeTags,
     active: bot.active,
     paused: bot.paused,
     displayName: bot.displayName,
     publishedAt: bot.publishedAt,
     preferredAction: bot.preferredAction,
+    roamStatus: bot.roamStatus ?? roamStatusFor(bot),
   };
 }
 

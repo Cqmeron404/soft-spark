@@ -13,6 +13,16 @@ export const tokens = {
   radiusCard: 20,
   radiusChip: 999,
   radiusButton: 14,
+  radiusPhone: 42,
+  graph: {
+    well: "#1A1614",
+    female: "#E891B0",
+    male: "#6BA3E8",
+    you: "#F0C4A8",
+    youRing: "#E8A598",
+    edge: "rgba(255,248,242,0.18)",
+    hopMs: 1200,
+  },
   band: {
     low: { fill: "#C4B5AB", text: "#2A211C" },
     building: { fill: "#D4A574", text: "#2A211C" },

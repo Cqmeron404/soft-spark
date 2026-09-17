@@ -289,6 +289,9 @@ async function main() {
     city?: string;
     neighborhood?: string;
     hobbies?: string[];
+    gender?: string;
+    lookingForGender?: string;
+    prefs?: { intent?: string; lookingFor?: string; lookingForGender?: string };
   }>(await app.request("/users/me", { headers: { cookie: mayaAuth.cookie } }));
   if (mayaProfile.photoUrl !== MAYA.photoUrl) failures.push("onboard did not persist photoUrl");
   else console.log("ok  onboard Maya + Jordan (User + DatingBot + photoUrl)");
@@ -302,15 +305,27 @@ async function main() {
   ) {
     failures.push(`onboard did not persist Edgar v1 profile: ${JSON.stringify(mayaProfile)}`);
   } else console.log("ok  onboard persisted Edgar v1 fields (likes / hobbies / height / hair / eyes / city)");
+  if (
+    mayaProfile.gender !== "female" ||
+    mayaProfile.lookingForGender !== "male" ||
+    mayaProfile.prefs?.intent !== "relationship" ||
+    mayaProfile.prefs?.lookingFor !== "relationship"
+  ) {
+    failures.push(`onboard did not persist Spark gender/intent: ${JSON.stringify(mayaProfile)}`);
+  } else console.log("ok  onboard persisted Spark gender / lookingForGender / intent");
 
   const mayaBot = await json<{
     displayName?: string;
     publishedAt?: string;
     preferredAction?: string;
+    roamStatus?: string;
+    styleTags?: string[];
   }>(await app.request("/users/me/bot", { headers: { cookie: mayaAuth.cookie } }));
   if (mayaBot.displayName !== "Ember" || !mayaBot.publishedAt || mayaBot.preferredAction !== "wait") {
     failures.push(`onboard bot name/publish missing: ${JSON.stringify(mayaBot)}`);
-  } else console.log("ok  Maya named bot Ember and published (wait)");
+  } else if (mayaBot.roamStatus !== "paused" || !mayaBot.styleTags?.includes("Curious")) {
+    failures.push(`onboard roamStatus/styleTags missing: ${JSON.stringify(mayaBot)}`);
+  } else console.log("ok  Maya named bot Ember and published (wait / paused)");
 
   const leanAuth = await signUp(app, {
     email: "lean@softspark.dev",
@@ -335,6 +350,7 @@ async function main() {
     publishedAt?: string;
     preferredAction?: string;
     displayName?: string;
+    roamStatus?: string;
   }>(
     await app.request("/users/me/bot/publish", {
       method: "POST",
@@ -342,9 +358,9 @@ async function main() {
       body: JSON.stringify({ preferredAction: "roam" }),
     })
   );
-  if (!leanPublish.publishedAt || leanPublish.preferredAction !== "roam") {
+  if (!leanPublish.publishedAt || leanPublish.preferredAction !== "roam" || leanPublish.roamStatus !== "roaming") {
     failures.push(`publish roam failed: ${JSON.stringify(leanPublish)}`);
-  } else console.log("ok  POST /users/me/bot/publish → roam");
+  } else console.log("ok  POST /users/me/bot/publish → roam / roaming");
 
   const leanNamed = await json<{ displayName?: string }>(
     await app.request("/users/me/bot", {

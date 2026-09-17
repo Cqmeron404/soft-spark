@@ -18,8 +18,10 @@ import type {
   InviteStatus,
   InviteUserStatus,
   LookingFor,
+  LookingForGender,
   MatchState,
   PriceTier,
+  RoamStatus,
 } from "@soft-spark/shared";
 import type { ChemistryDims, Place } from "@soft-spark/match-engine";
 
@@ -61,6 +63,7 @@ export type BotRecord = {
   displayName?: string;
   publishedAt?: string;
   preferredAction: "roam" | "wait";
+  roamStatus?: RoamStatus;
 };
 
 export type PreferenceRecord = {
@@ -71,6 +74,7 @@ export type PreferenceRecord = {
   maxTravelKm: number;
   dealbreakers: string[];
   lookingFor: LookingFor;
+  lookingForGender?: LookingForGender;
   interests: string[];
 };
 
@@ -211,6 +215,9 @@ function asBot(row: typeof datingBots.$inferSelect): BotRecord {
     displayName: row.displayName ?? undefined,
     publishedAt: row.publishedAt ? iso(row.publishedAt) : undefined,
     preferredAction: row.preferredAction === "roam" ? "roam" : "wait",
+    roamStatus: row.roamStatus === "roaming" || row.roamStatus === "paused" || row.roamStatus === "draft"
+      ? row.roamStatus
+      : undefined,
   };
 }
 
@@ -223,6 +230,10 @@ function asPrefs(row: typeof preferences.$inferSelect): PreferenceRecord {
     maxTravelKm: row.maxTravelKm,
     dealbreakers: row.dealbreakers ?? [],
     lookingFor: (row.lookingFor as LookingFor) ?? "unsure",
+    lookingForGender:
+      row.lookingForGender === "male" || row.lookingForGender === "female" || row.lookingForGender === "both"
+        ? row.lookingForGender
+        : undefined,
     interests: row.interests ?? [],
   };
 }
@@ -383,6 +394,7 @@ export function createDbStore(db: SparkDb) {
           displayName: input.displayName,
           publishedAt: input.publishedAt ? new Date(input.publishedAt) : undefined,
           preferredAction: input.preferredAction ?? "wait",
+          roamStatus: input.roamStatus,
         })
         .returning();
       return asBot(row);
@@ -403,6 +415,7 @@ export function createDbStore(db: SparkDb) {
           displayName: patch.displayName ?? cur.displayName,
           publishedAt: patch.publishedAt ? new Date(patch.publishedAt) : cur.publishedAt ? new Date(cur.publishedAt) : null,
           preferredAction: patch.preferredAction ?? cur.preferredAction,
+          roamStatus: patch.roamStatus ?? cur.roamStatus,
         })
         .where(eq(datingBots.id, cur.id))
         .returning();
@@ -419,6 +432,7 @@ export function createDbStore(db: SparkDb) {
           maxTravelKm: input.maxTravelKm,
           dealbreakers: input.dealbreakers,
           lookingFor: input.lookingFor,
+          lookingForGender: input.lookingForGender,
           interests: input.interests,
         })
         .returning();
@@ -439,6 +453,7 @@ export function createDbStore(db: SparkDb) {
           maxTravelKm: patch.maxTravelKm ?? cur.maxTravelKm,
           dealbreakers: patch.dealbreakers ?? cur.dealbreakers,
           lookingFor: patch.lookingFor ?? cur.lookingFor,
+          lookingForGender: patch.lookingForGender ?? cur.lookingForGender,
           interests: patch.interests ?? cur.interests,
         })
         .where(eq(preferences.id, cur.id))

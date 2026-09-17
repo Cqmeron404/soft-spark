@@ -1,10 +1,15 @@
 import type {
   ConfidenceBand,
   Geo,
+  Intent,
   InviteStatus,
   InviteUserStatus,
+  LookingFor,
+  LookingForGender,
   MatchState,
   PreferredAction,
+  ProfileGender,
+  RoamStatus,
   PriceTier,
 } from "./types";
 
@@ -69,19 +74,23 @@ export type MatchSearchResult = {
 export type BotDto = {
   id: string;
   vibeTags: string[];
+  /** Spark look-step style tags (same list as vibeTags). */
+  styleTags: string[];
   active: boolean;
   paused: boolean;
   /** User-chosen bot name. Falls back to "{displayName}'s bot" in UI if missing. */
   displayName?: string;
   publishedAt?: string;
   preferredAction: PreferredAction;
+  roamStatus: RoamStatus;
 };
 
 export type UserDto = {
   id: string;
   displayName: string;
   age: number;
-  gender: string;
+  gender: ProfileGender | string;
+  lookingForGender: LookingForGender;
   interestedIn: string[];
   bio?: string;
   photoUrl?: string;
@@ -93,14 +102,20 @@ export type UserDto = {
   likes: string[];
   dislikes: string[];
   hobbies: string[];
+  botDatingOptIn: boolean;
   homeGeo: Geo;
   homeTz: string;
   prefs: {
     cuisine: string[];
     budget: PriceTier;
     maxTravelKm: number;
+    maxTravelMiles: number;
     dealbreakers: string[];
-    lookingFor: string;
+    /** Spark lock: relationship | casual | unsure. */
+    intent: Intent;
+    /** Alias of intent for the existing match-engine snapshot. Not gender. */
+    lookingFor: LookingFor | string;
+    lookingForGender: LookingForGender;
     /** Mirror of hobbies for the existing match-engine snapshot. */
     interests: string[];
   };
@@ -112,6 +127,7 @@ export type OnboardBody = {
     displayName: string;
     age: number;
     gender: string;
+    lookingForGender?: LookingForGender;
     interestedIn: string[];
     bio?: string;
     height?: string;
@@ -126,14 +142,20 @@ export type OnboardBody = {
   prefs: {
     cuisine: string[];
     budget: PriceTier;
-    maxTravelKm: number;
+    maxTravelKm?: number;
+    maxTravelMiles?: number;
     dealbreakers: string[];
-    lookingFor?: string;
+    /** Spark lock name for relationship intent. */
+    intent?: Intent | string;
+    /** Legacy alias of intent — not gender. */
+    lookingFor?: LookingFor | string;
+    lookingForGender?: LookingForGender;
     interests?: string[];
   };
-  homeGeo: Geo;
+  homeGeo?: Geo;
   homeTz?: string;
   vibeTags?: string[];
+  styleTags?: string[];
   photoUrl?: string;
   /** Name the dating bot — required for a complete first-time create. */
   botName?: string;

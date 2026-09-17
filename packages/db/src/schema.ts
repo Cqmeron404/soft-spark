@@ -103,6 +103,7 @@ export const datingBots = pgTable("dating_bots", {
   displayName: text("display_name"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   preferredAction: text("preferred_action").notNull().default("wait"),
+  roamStatus: text("roam_status"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -116,6 +117,7 @@ export const preferences = pgTable("preferences", {
   maxTravelKm: integer("max_travel_km").notNull(),
   dealbreakers: text("dealbreakers").array().notNull(),
   lookingFor: text("looking_for").notNull().default("unsure"),
+  lookingForGender: text("looking_for_gender"),
   interests: text("interests").array().notNull(),
 });
 

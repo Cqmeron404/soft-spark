@@ -12,6 +12,11 @@
   --ss-radius-card: 20px;
   --ss-radius-chip: 999px;
   --ss-radius-button: 14px;
+  --ss-radius-phone: 42px;
+  --ss-graph-well: #1a1614;
+  --ss-graph-female: #e891b0;
+  --ss-graph-male: #6ba3e8;
+  --ss-graph-you: #f0c4a8;
   --ss-font-ui: Inter, "SF Pro Text", system-ui, sans-serif;
   --ss-font-display: Fraunces, Georgia, "Times New Roman", serif;
 }
@@ -168,7 +173,7 @@
   width: min(390px, 100%);
   height: min(844px, calc(100dvh - 24px));
   background: var(--ss-surface);
-  border-radius: 36px;
+  border-radius: var(--ss-radius-phone);
   border: 1px solid var(--ss-border);
   box-shadow:
     0 0 0 10px color-mix(in srgb, #2a211c 6%, #fff8f2),
@@ -258,6 +263,65 @@
 .ss-chip-on {
   background: var(--ss-accent-soft);
   border-color: color-mix(in srgb, var(--ss-accent) 55%, var(--ss-border));
+}
+
+.ss-graph-well {
+  background: var(--ss-graph-well);
+  border-radius: 22px;
+  height: 280px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff8f2 8%, transparent);
+}
+
+.ss-graph-footer {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.ss-progress-dots {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ss-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ss-border);
+}
+
+.ss-progress-dot[data-on="true"] {
+  background: var(--ss-accent);
+  transform: scale(1.2);
+}
+
+.ss-how-it-works {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  color: var(--ss-text-muted);
+  font-size: 14px;
+}
+
+.ss-try-as {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--ss-text-muted);
+}
+
+.ss-try-as button {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 32px;
+  color: var(--ss-text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
 }
 
 .ss-action-card {

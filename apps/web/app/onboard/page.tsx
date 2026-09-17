@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { OnboardWizard } from "@/components/OnboardWizard";
 import { PublishActions } from "@/components/PublishActions";
 import { getBot, getMe } from "@/lib/api";
-import { getAuthSession } from "@/lib/auth";
+import { ensureGuestSession } from "@/lib/guest-session";
 
 export default function OnboardPage() {
   const router = useRouter();
@@ -15,12 +15,13 @@ export default function OnboardPage() {
 
   useEffect(() => {
     void (async () => {
-      const data = await getAuthSession();
-      if (!data?.user) {
-        router.replace("/auth/sign-in");
+      try {
+        const data = await ensureGuestSession();
+        setName(data.user.name ?? "");
+      } catch {
+        setReady(true);
         return;
       }
-      setName(data.user.name ?? "");
       try {
         await getMe();
         const bot = await getBot();
@@ -28,7 +29,7 @@ export default function OnboardPage() {
           router.replace("/");
           return;
         }
-        setPublishOnly(bot.displayName ?? data.user.name ?? "your bot");
+        setPublishOnly(bot.displayName ?? "your bot");
         setReady(true);
       } catch {
         setReady(true);
