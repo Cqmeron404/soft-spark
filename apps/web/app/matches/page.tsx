@@ -72,7 +72,6 @@ export default function MatchesPage() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>Your bots are out</h1>
       <ConnectingCaption live={live} />
       {toast ? (
         <SoftToast
@@ -87,7 +86,7 @@ export default function MatchesPage() {
         <BotSearchAction
           autoStart={autoRoam && liveItems.length === 0}
           botName={botName}
-          targets={liveItems.map((m) => ({ id: m.id }))}
+          targets={liveItems.map((m) => ({ id: m.id, band: m.band }))}
           onSelectTarget={(id) => {
             const match = liveItems.find((m) => m.id === id);
             if (!match) return;

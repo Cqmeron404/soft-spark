@@ -19,7 +19,7 @@ export function matchHref(match: Pick<MatchDetail, "id" | "state">): string {
 export function BotSearchAction(props: {
   autoStart?: boolean;
   botName?: string;
-  targets?: Array<Pick<MatchListItem, "id">>;
+  targets?: Array<Pick<MatchListItem, "id" | "band">>;
   onSelectTarget?: (id: string) => void;
 }) {
   const router = useRouter();
@@ -31,12 +31,18 @@ export function BotSearchAction(props: {
   const timer = useRef<number | null>(null);
   const autoStarted = useRef(false);
   const liveTargets = props.targets ?? [];
+  const inviteReady = liveTargets.some((m) => m.band === "invite_ready") || phase === "found";
   const displayPhase: SearchVizPhase =
     phase === "searching" || phase === "found" || phase === "empty"
       ? phase
       : liveTargets.length
         ? "searching"
         : "idle";
+  const band = inviteReady
+    ? "invite_ready"
+    : displayPhase === "searching"
+      ? "building"
+      : "low";
 
   useEffect(() => {
     void getMe()
@@ -106,9 +112,7 @@ export function BotSearchAction(props: {
         disabled={phase === "searching"}
         onSearch={() => void run()}
         botName={props.botName}
-        band={displayPhase === "found" ? "invite_ready" : displayPhase === "searching" ? "building" : "low"}
-        targets={liveTargets}
-        onSelectTarget={props.onSelectTarget}
+        band={band}
       />
       {error ? <p className="ss-error">{error}</p> : null}
     </div>
