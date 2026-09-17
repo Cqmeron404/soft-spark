@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { normalizeGender } from "@soft-spark/shared";
 import type { ConfidenceBand, LookingForGender, ProfileGender } from "@soft-spark/shared";
 import { BandChip } from "./BandChip";
 import { tokens } from "./tokens";
@@ -162,8 +161,6 @@ export function SearchVizPanel(props: {
   onSelectTarget?: (id: string) => void;
 }) {
   const lookingForGender = props.lookingForGender ?? "both";
-  const youGender = normalizeGender(props.youGender) ?? "female";
-  const youFill = youGender === "male" ? tokens.graph.male : tokens.graph.female;
   const { nodes, edges } = useMemo(() => seedGraph(lookingForGender), [lookingForGender]);
   const cycle = useMemo(() => hopCycle(nodes, edges, lookingForGender), [nodes, edges, lookingForGender]);
   const [hopIndex, setHopIndex] = useState(0);
@@ -319,7 +316,7 @@ export function SearchVizPanel(props: {
             );
           })}
           <circle cx={you.x} cy={you.y} r={11} fill="none" stroke={tokens.graph.youRing} strokeWidth="2.5" />
-          <circle cx={you.x} cy={you.y} r={6.5} fill={youFill} />
+          <circle cx={you.x} cy={you.y} r={6.5} fill={tokens.graph.you} />
         </svg>
       </div>
       {props.compact ? (
