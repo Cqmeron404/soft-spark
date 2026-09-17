@@ -309,6 +309,8 @@ async function viaAuthPreflightNoDb() {
   process.env.DATABASE_URL = "postgres://user:pass@127.0.0.1:1/spark";
   process.env.BETTER_AUTH_SECRET = "prod-secret-at-least-32-characters!";
   try {
+    const previewOrigin =
+      "https://soft-spark-git-cursor-soft-spark-roam-1c98a3-cameronjgroff-2605.vercel.app";
     check(
       corsAllowOrigin("https://soft-spark.vercel.app") === "https://soft-spark.vercel.app",
       "corsAllowOrigin allows WEB_ORIGIN"
@@ -317,7 +319,13 @@ async function viaAuthPreflightNoDb() {
       corsAllowOrigin("https://soft-spark.vercel.app/") === "https://soft-spark.vercel.app",
       "corsAllowOrigin ignores trailing slash"
     );
+    check(corsAllowOrigin(previewOrigin) === previewOrigin, "corsAllowOrigin allows Soft Spark Vercel preview");
     check(corsAllowOrigin("https://evil.example") === undefined, "corsAllowOrigin rejects other origins");
+    check(corsAllowOrigin("https://evil.vercel.app") === undefined, "corsAllowOrigin rejects other vercel.app apps");
+    check(
+      corsAllowOrigin("https://soft-spark-api.vercel.app") === undefined,
+      "corsAllowOrigin rejects the API host as a web Origin"
+    );
 
     const res = await withTimeout(
       OPTIONS(
@@ -376,6 +384,29 @@ async function viaAuthPreflightNoDb() {
         rewritten.status === 204 &&
           rewritten.headers.get("access-control-allow-origin") === "https://soft-spark.vercel.app",
         `OPTIONS /api/auth rewrite CORS status=${rewritten.status} ACAO=${rewritten.headers.get("access-control-allow-origin")}`
+      );
+    }
+
+    const preview = await withTimeout(
+      OPTIONS(
+        new Request("https://soft-spark-api.vercel.app/auth/sign-up/email", {
+          method: "OPTIONS",
+          headers: {
+            Origin: previewOrigin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,authorization",
+          },
+        })
+      ),
+      4000,
+      "OPTIONS /auth preview origin"
+    );
+    if (!preview) {
+      failures.push("OPTIONS /auth preview origin returned void");
+    } else {
+      check(
+        preview.status === 204 && preview.headers.get("access-control-allow-origin") === previewOrigin,
+        `OPTIONS /auth preview CORS status=${preview.status} ACAO=${preview.headers.get("access-control-allow-origin")}`
       );
     }
 

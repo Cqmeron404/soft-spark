@@ -13,7 +13,7 @@ import { PGlite } from "@soft-spark/db";
 import { runInviteThresholdRegression } from "@soft-spark/match-engine";
 import { createApp } from "./app.js";
 import { bootstrap } from "./bootstrap.js";
-import { webOrigins } from "./cors.js";
+import { isSoftSparkVercelWebOrigin, webOrigins } from "./cors.js";
 import { ensureDemoUsers } from "./demo-users.js";
 import { allowDemoUsers, bootMissing, INTERNAL_JOB_HEADER, placesMissing } from "./env.js";
 import { runNexusSoakScenarios } from "./nexus-soak.js";
@@ -187,6 +187,14 @@ async function main() {
     failures.push("prod boot must not fail solely for missing Places when seed mode is on");
   } else console.log("ok  prod boot does not require Places in seed mode");
 
+  const previewHost =
+    "https://soft-spark-git-cursor-soft-spark-roam-1c98a3-cameronjgroff-2605.vercel.app";
+  if (!isSoftSparkVercelWebOrigin(previewHost)) {
+    failures.push("Soft Spark Vercel preview origin must be allowed for Hobby PR smoke");
+  } else if (isSoftSparkVercelWebOrigin("https://evil.vercel.app")) {
+    failures.push("other vercel.app apps must not be CORS-allowed");
+  } else console.log("ok  Soft Spark Vercel preview origin allowlist");
+
   const ctx = await bootstrap({ pglite: new PGlite() });
   const app = createApp(ctx);
 
@@ -219,6 +227,61 @@ async function main() {
   if (blocked.headers.get("access-control-allow-origin") === "https://evil.example") {
     failures.push("auth OPTIONS must not echo an untrusted Origin");
   } else console.log("ok  OPTIONS /auth/* does not reflect untrusted Origin");
+
+  const previewOrigin =
+    "https://soft-spark-git-cursor-soft-spark-roam-1c98a3-cameronjgroff-2605.vercel.app";
+  const previewPreflight = await app.request("/auth/sign-up/email", {
+    method: "OPTIONS",
+    headers: {
+      Origin: previewOrigin,
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "content-type,authorization",
+    },
+  });
+  if (
+    previewPreflight.status !== 204 ||
+    previewPreflight.headers.get("access-control-allow-origin") !== previewOrigin
+  ) {
+    failures.push(
+      `auth OPTIONS CORS for Soft Spark Vercel preview expected 204 + ACAO, got ${previewPreflight.status} origin=${previewPreflight.headers.get("access-control-allow-origin")}`
+    );
+  } else console.log("ok  OPTIONS /auth/* CORS for Soft Spark Vercel preview origin");
+
+  const otherVercel = await app.request("/auth/sign-up/email", {
+    method: "OPTIONS",
+    headers: {
+      Origin: "https://evil.vercel.app",
+      "Access-Control-Request-Method": "POST",
+    },
+  });
+  if (otherVercel.headers.get("access-control-allow-origin") === "https://evil.vercel.app") {
+    failures.push("auth OPTIONS must not echo a different vercel.app Origin");
+  } else console.log("ok  OPTIONS /auth/* does not reflect other vercel.app apps");
+
+  const previewMe = await app.request("/users/me", { headers: { Origin: previewOrigin } });
+  if (previewMe.headers.get("access-control-allow-origin") !== previewOrigin) {
+    failures.push(
+      `GET /users/me preview Origin must echo ACAO (else browser Failed to fetch), got ${previewMe.headers.get("access-control-allow-origin")}`
+    );
+  } else console.log("ok  GET /users/me echoes Soft Spark Vercel preview Origin");
+
+  const previewSignUp = await app.request("/auth/sign-up/email", {
+    method: "POST",
+    headers: { Origin: previewOrigin, "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "preview.cors@softspark.dev",
+      password: "spark-demo-preview-cors",
+      name: "Preview",
+    }),
+  });
+  const previewSignUpBody = await json<{ user?: { id?: string }; message?: string; code?: string }>(previewSignUp);
+  if (previewSignUp.status >= 400 || !previewSignUpBody.user?.id) {
+    failures.push(
+      `ensureGuest sign-up from Soft Spark Vercel preview expected 2xx, got ${previewSignUp.status} ${JSON.stringify(previewSignUpBody)}`
+    );
+  } else if (previewSignUp.headers.get("access-control-allow-origin") !== previewOrigin) {
+    failures.push("preview sign-up must echo ACAO so the browser can read the Bearer token");
+  } else console.log("ok  POST /auth/sign-up/email from Soft Spark Vercel preview (ensureGuest)");
 
   const unauth = await app.request("/matches");
   if (unauth.status !== 401) failures.push(`protected /matches expected 401, got ${unauth.status}`);
