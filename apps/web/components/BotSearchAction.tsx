@@ -102,7 +102,7 @@ export function BotSearchAction(props: {
         lookingForGender={lookingForGender}
         youGender={youGender}
         etaSeconds={BOT_SEARCH_ETA.typicalSeconds}
-        remainingSeconds={remaining}
+        remainingSeconds={phase === "searching" ? remaining : undefined}
         disabled={phase === "searching"}
         onSearch={() => void run()}
         botName={props.botName}
