@@ -69,7 +69,7 @@ Required (Phase 1 auth/DB — Vercel **API** project):
 - `DATABASE_URL` — Postgres URL
 - `BETTER_AUTH_SECRET` — 32+ char signing secret (`AUTH_SECRET` alias)
 - `BETTER_AUTH_URL` — public API origin (`https://soft-spark-api.vercel.app`)
-- `WEB_ORIGIN` — public web origin (`https://soft-spark.vercel.app`). Must match the browser `Origin` header exactly (no trailing slash). Used for CORS `Access-Control-Allow-Origin` and Better Auth `trustedOrigins`.
+- `WEB_ORIGIN` — public web origin (`https://soft-spark.vercel.app`). Must match the browser `Origin` header exactly (no trailing slash). Used for CORS `Access-Control-Allow-Origin` and Better Auth `trustedOrigins`. Hobby also allows this team's Soft Spark web preview hosts (`https://soft-spark-*-cameronjgroff-2605.vercel.app`) so PR smoke can call the API. Comma-separate extra exact origins if needed.
 - `AUTH_MODE=prod` — optional; already implied when `NODE_ENV=production`
 - `INTERNAL_JOB_SECRET` — required to invoke `POST /internal/orchestrate` in production (header `x-internal-job-secret`). Not a boot requirement; unset or wrong → **401**. Never commit a value. `GET /internal/events` is **404** in production.
 
@@ -121,7 +121,7 @@ pnpm --filter @soft-spark/db exec drizzle-kit push
 | `BETTER_AUTH_URL` | prod | Public API origin, default `http://localhost:8787`. |
 | `AUTH_MODE` | no | `prod` disables `x-user-id` bypass (also off when `NODE_ENV=production`). |
 | `INTERNAL_JOB_SECRET` | prod jobs | Required to call `POST /internal/orchestrate` when `AUTH_MODE=prod` or `NODE_ENV=production`. Send header `x-internal-job-secret`. Unset or wrong → **401**. Local/demo leaves the route open. Never commit a value. |
-| `WEB_ORIGIN` | prod | Exact web origin(s) for CORS + Better Auth `trustedOrigins`. No trailing slash. Comma-separated if needed. Live: `https://soft-spark.vercel.app`. |
+| `WEB_ORIGIN` | prod | Exact web origin(s) for CORS + Better Auth `trustedOrigins`. No trailing slash. Comma-separated if needed. Live: `https://soft-spark.vercel.app`. This team's Soft Spark web preview hosts (`https://soft-spark-*-cameronjgroff-2605.vercel.app`) are allowed without listing each PR URL. |
 | `GOOGLE_PLACES_API_KEY` | prod Places | Nearby search when seed is **not** forced. 0 results → `exploring` + `match.venue_unavailable`. |
 | `ALLOW_VENUE_SEED` | $0 venues | `1` allows Denver catalog seed **and** catalog VenueSuggester in production (no Places key). |
 | `ALLOW_DEMO_USERS` | live one-tap | Default **on**. API boot ensures Maya/Jordan accounts matching the web sign-in buttons. Set `0` to disable. |

@@ -66,8 +66,32 @@ export async function getAuthSession(): Promise<{ user: AuthUser } | null> {
       "/auth/get-session"
     );
     if (data && "user" in data && data.user) return { user: data.user };
-    return null;
   } catch {
-    return null;
+    // Cookie get-session is empty on cross-site Hobby; Bearer still works on API routes.
+  }
+  return sessionFromBearer();
+}
+
+/** Hobby web: cookies are third-party; resolveSession honors Authorization on /users/me. */
+async function sessionFromBearer(): Promise<{ user: AuthUser } | null> {
+  const token = readToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(`${API_URL}/users/me`, {
+      headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+      credentials: "include",
+    });
+    if (res.status === 401) {
+      writeToken(null);
+      return null;
+    }
+    if (res.ok) {
+      const data = (await res.json()) as { id?: string; displayName?: string };
+      if (data.id) return { user: { id: data.id, name: data.displayName } };
+    }
+    // 404 profile_incomplete still means this Bearer is a real session.
+    return { user: { id: "bearer", name: null } };
+  } catch {
+    return { user: { id: "bearer", name: null } };
   }
 }

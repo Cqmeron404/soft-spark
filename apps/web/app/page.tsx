@@ -9,6 +9,7 @@ import { OnboardWizard } from "@/components/OnboardWizard";
 import { getAuthSession } from "@/lib/auth";
 import { getBot, getMe } from "@/lib/api";
 import { ensureGuestSession } from "@/lib/guest-session";
+import { ROAM_HREF } from "@/lib/nav";
 import { writeSession } from "@/lib/session";
 
 export default function Home() {
@@ -103,7 +104,7 @@ export default function Home() {
         />
       ) : null}
       {published ? (
-        <Link href="/matches?roam=1" className="ss-btn ss-btn-primary">
+        <Link href={ROAM_HREF} className="ss-btn ss-btn-primary">
           Roam / find a match
         </Link>
       ) : (
