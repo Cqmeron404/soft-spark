@@ -49,7 +49,10 @@ export function signInEmail(input: { email: string; password: string }) {
 
 export async function signOut() {
   try {
-    await authJson("/auth/sign-out", { method: "POST" });
+    await Promise.race([
+      authJson("/auth/sign-out", { method: "POST" }),
+      new Promise((_, reject) => window.setTimeout(() => reject(new Error("sign-out timeout")), 2000)),
+    ]);
   } finally {
     writeToken(null);
   }

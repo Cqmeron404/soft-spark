@@ -193,7 +193,7 @@ export function SearchVizPanel(props: {
         </svg>
       </div>
       <div style={{ display: "grid", gap: 8 }}>
-        <h2 style={{ fontFamily: "var(--ss-font-display)", fontSize: 26, margin: 0 }}>{title}</h2>
+        <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 26, margin: 0 }}>{title}</h1>
         <p style={{ margin: 0, color: "var(--ss-text-muted)", lineHeight: 1.45 }}>
           {props.phase === "found"
             ? "Invite is ready — status only, no chat."

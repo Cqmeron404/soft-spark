@@ -73,7 +73,9 @@ export default function MatchesPage() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>Your bot is out</h1>
+      {showSearch ? null : (
+        <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>Your bot is out</h1>
+      )}
       <ConnectingCaption live={live} />
       {toast ? (
         <SoftToast

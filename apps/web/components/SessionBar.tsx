@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@soft-spark/ui";
-import { signOut } from "@/lib/auth";
+import { signOut, writeToken } from "@/lib/auth";
 import { SESSION_EVENT, clearSession, readSession, type SessionUser } from "@/lib/session";
 
 export function SessionBar() {
@@ -49,14 +49,13 @@ export function SessionBar() {
             <button
               type="button"
               className="ss-btn ss-btn-ghost"
-              style={{ minHeight: 44, padding: "0 12px", fontSize: 13 }}
-              onClick={async () => {
-                try {
-                  await signOut();
-                } finally {
-                  clearSession();
+              style={{ minHeight: 44, padding: "0 12px", fontSize: 13, zIndex: 2 }}
+              onClick={() => {
+                clearSession();
+                writeToken(null);
+                void signOut().finally(() => {
                   window.location.assign("/");
-                }
+                });
               }}
             >
               Sign out
