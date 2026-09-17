@@ -136,7 +136,6 @@ export function OnboardWizard(props: { defaultName?: string }) {
           maxTravelMiles,
           dealbreakers,
           intent,
-          lookingFor: intent,
           lookingForGender,
           ageRangeMin: Number(ageRangeMin) || undefined,
           ageRangeMax: Number(ageRangeMax) || undefined,
@@ -282,7 +281,7 @@ export function OnboardWizard(props: { defaultName?: string }) {
             </div>
           </fieldset>
           <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 8 }}>
-            <legend style={{ fontWeight: 600 }}>Interested in</legend>
+            <legend style={{ fontWeight: 600 }}>Looking for gender</legend>
             <div className="ss-chip-row">
               {LOOKING_FOR_GENDER_OPTIONS.map((g) => (
                 <button
@@ -298,7 +297,7 @@ export function OnboardWizard(props: { defaultName?: string }) {
             </div>
           </fieldset>
           <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 8 }}>
-            <legend style={{ fontWeight: 600 }}>Looking for</legend>
+            <legend style={{ fontWeight: 600 }}>Intent</legend>
             <div className="ss-chip-row">
               {INTENT_OPTIONS.map((opt) => (
                 <button

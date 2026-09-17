@@ -21,6 +21,7 @@ export const tokens = {
     you: "#F0C4A8",
     youRing: "#E8A598",
     edge: "rgba(255,248,242,0.18)",
+    filtered: "#6E655E",
     hopMs: 1200,
   },
   band: {

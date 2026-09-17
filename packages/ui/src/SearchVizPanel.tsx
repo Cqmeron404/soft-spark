@@ -155,6 +155,7 @@ export function SearchVizPanel(props: {
   onSearch?: () => void;
   disabled?: boolean;
   botName?: string;
+  compact?: boolean;
 }) {
   const lookingForGender = props.lookingForGender ?? "both";
   const { nodes, edges } = useMemo(() => seedGraph(lookingForGender), [lookingForGender]);
@@ -164,6 +165,7 @@ export function SearchVizPanel(props: {
   const reduced = prefersReducedMotion();
   const searching = props.phase === "searching";
   const hopMs = tokens.graph.hopMs;
+  const targetable = (gender: GraphGender) => lookingForGender === "both" || gender === lookingForGender;
 
   useEffect(() => {
     if (!searching || reduced || cycle.length < 2) {
@@ -203,17 +205,19 @@ export function SearchVizPanel(props: {
       ? "Your bot found someone"
       : props.phase === "empty"
         ? "Still looking"
-        : "Your bot is out";
+        : searching
+          ? "Looking for dates…"
+          : "Your bot is out";
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div
-        className="ss-graph-well"
+        className={props.compact ? "ss-graph-well ss-graph-well-compact" : "ss-graph-well"}
         role="img"
         aria-label={
           searching
-            ? `Network of nearby bots. Pink is female, blue is male. Your ${props.youGender ?? "bot"} hops toward ${lookingForGender === "both" ? "everyone" : lookingForGender} nodes.`
-            : "Dating-pool graph. Pink is female, blue is male."
+            ? `Network of nearby bots. Pink is female, blue is male. Filtered-out genders are grey. Your bot hops toward ${lookingForGender === "both" ? "everyone" : lookingForGender}.`
+            : "Dating-pool graph. Pink is female, blue is male. Grey nodes are filtered out by lookingForGender."
         }
       >
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" height="100%" aria-hidden>
@@ -244,27 +248,34 @@ export function SearchVizPanel(props: {
               opacity={0.7}
             />
           ) : null}
-          {nodes.map((node) => (
-            <circle
-              key={node.id}
-              cx={node.x}
-              cy={node.y}
-              r={node.r}
-              fill={node.gender === "female" ? tokens.graph.female : tokens.graph.male}
-              opacity={node.isolated ? 0.55 : 1}
-            />
-          ))}
+          {nodes.map((node) => {
+            const open = targetable(node.gender);
+            return (
+              <circle
+                key={node.id}
+                cx={node.x}
+                cy={node.y}
+                r={node.r}
+                fill={open ? (node.gender === "female" ? tokens.graph.female : tokens.graph.male) : tokens.graph.filtered}
+                opacity={open ? (node.isolated ? 0.7 : 1) : 0.4}
+                style={{ cursor: open ? "pointer" : "not-allowed" }}
+              />
+            );
+          })}
           <circle cx={you.x} cy={you.y} r={11} fill="none" stroke={tokens.graph.youRing} strokeWidth="2.5" />
           <circle cx={you.x} cy={you.y} r={6.5} fill={tokens.graph.you} />
         </svg>
       </div>
+      {props.compact ? (
+        <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 13 }}>Roaming</p>
+      ) : (
       <div style={{ display: "grid", gap: 8 }}>
         <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 26, margin: 0 }}>{title}</h1>
         <p style={{ margin: 0, color: "var(--ss-text-muted)", lineHeight: 1.45 }}>
           {props.phase === "found"
             ? "Invite is ready — status only, no chat."
             : props.phase === "empty"
-              ? "No active matches yet — your bot’s exploring"
+              ? "Your bot is out — we’ll ping you when chemistry builds"
               : searching
                 ? `${props.botName?.trim() || "Your bot"} is hopping the pool. Pink is female, blue is male.`
                 : "Send your bot into the pool. You’ll only see a status band and an invite."}
@@ -289,6 +300,7 @@ export function SearchVizPanel(props: {
           </button>
         ) : null}
       </div>
+      )}
     </div>
   );
 }

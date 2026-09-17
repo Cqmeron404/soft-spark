@@ -55,7 +55,7 @@ export default function ProfilePage() {
     setLikes(user.likes ?? []);
     setDislikes(user.dislikes ?? []);
     setHobbies(user.hobbies.length ? user.hobbies : user.prefs.interests ?? []);
-    setIntent(user.prefs.intent || user.prefs.lookingFor || "relationship");
+    setIntent(user.prefs.intent || "relationship");
     setPhotoUrl(user.photoUrl);
   }
 
@@ -104,7 +104,7 @@ export default function ProfilePage() {
           dislikes,
           hobbies,
         },
-        prefs: { intent, lookingFor: intent, lookingForGender, interests: hobbies },
+        prefs: { intent, lookingForGender, interests: hobbies },
       });
       apply(user);
       writeSession({ id: user.id, displayName: user.displayName });
@@ -143,7 +143,7 @@ export default function ProfilePage() {
         </div>
       </fieldset>
       <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 8 }}>
-        <legend style={{ fontWeight: 600 }}>Looking for</legend>
+        <legend style={{ fontWeight: 600 }}>Looking for gender</legend>
         <div className="ss-chip-row">
           {LOOKING_FOR_GENDER_OPTIONS.map((g) => (
             <button

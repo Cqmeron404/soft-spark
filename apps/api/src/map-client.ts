@@ -45,7 +45,6 @@ export async function toUserDto(store: SparkStore, userId: string): Promise<User
       maxTravelMiles: kmToMiles(prefs.maxTravelKm),
       dealbreakers: prefs.dealbreakers,
       intent: normalizeIntent(prefs.lookingFor),
-      lookingFor: prefs.lookingFor,
       lookingForGender:
         prefs.lookingForGender ?? lookingForGenderFromInterestedIn(user.interestedIn),
       ageRangeMin: prefs.ageRangeMin,

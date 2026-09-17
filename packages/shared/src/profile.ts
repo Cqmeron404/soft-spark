@@ -10,8 +10,8 @@ import type {
 /**
  * Spark create-bot-flow-v1 + Edgar aliases. Persist exactly these:
  * botDisplayName, vibeLine, photoUrl, heightCm, hair, eyes, styleTags,
- * likes≥1, hobbies≥1, dislikes, dealbreakers, lookingFor/intent,
- * gender, interestedIn/lookingForGender, age, ageRangeMin/Max, homeGeo,
+ * likes≥1, hobbies≥1, dislikes, dealbreakers, intent (relationship|casual|unsure),
+ * gender male|female, lookingForGender male|female|both, age, ageRangeMin/Max, homeGeo,
  * maxTravelMiles, cuisine, budget, botDatingOptIn, roamStatus.
  */
 export const V1_PROFILE_FIELDS = [
@@ -31,7 +31,6 @@ export const V1_PROFILE_FIELDS = [
   "city",
   "neighborhood",
   "intent",
-  "lookingFor",
   "gender",
   "lookingForGender",
 ] as const;

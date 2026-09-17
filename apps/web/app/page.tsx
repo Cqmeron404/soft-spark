@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { BotDto, UserDto } from "@soft-spark/shared";
-import { TAGLINE } from "@soft-spark/ui";
+import { SearchVizPanel, TAGLINE } from "@soft-spark/ui";
 import { WelcomeLanding } from "@/components/WelcomeLanding";
 import { getAuthSession } from "@/lib/auth";
 import { getBot, getMe } from "@/lib/api";
@@ -88,6 +88,16 @@ export default function Home() {
           ))}
         </div>
       </div>
+      {published ? (
+        <SearchVizPanel
+          compact
+          phase={roaming ? "searching" : "idle"}
+          lookingForGender={me.lookingForGender ?? me.prefs.lookingForGender}
+          youGender={me.gender}
+          botName={botName}
+          band={roaming ? "building" : "low"}
+        />
+      ) : null}
       {published ? (
         <Link href="/matches?roam=1" className="ss-btn ss-btn-primary">
           Roam / find a match

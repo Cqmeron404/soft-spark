@@ -86,8 +86,8 @@ export function createApp(deps: AppDeps) {
     }
     const profile = body.profile;
     const prefs = body.prefs;
-    if (!profile?.displayName || !profile.age || !profile.gender) {
-      return c.json({ error: "profile.displayName, age, gender required" }, 400);
+    if (!profile?.displayName || !profile.age || !normalizeGender(profile.gender)) {
+      return c.json({ error: "profile.displayName, age, and gender (male|female) required" }, 400);
     }
     const maxTravelKm =
       prefs?.maxTravelKm ??
@@ -105,7 +105,7 @@ export function createApp(deps: AppDeps) {
     const lookingForGender =
       normalizeLookingForGender(prefs.lookingForGender ?? profile.lookingForGender) ??
       lookingForGenderFromInterestedIn(profile.interestedIn);
-    const gender = normalizeGender(profile.gender) ?? profile.gender;
+    const gender = normalizeGender(profile.gender)!;
     const intent = normalizeIntent(prefs.intent ?? prefs.lookingFor);
     const heightCm = parseHeightCm(profile.heightCm ?? profile.height);
     const hairColor = normalizeShortText(profile.hair ?? profile.hairColor);

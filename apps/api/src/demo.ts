@@ -296,7 +296,6 @@ async function main() {
     lookingForGender?: string;
     prefs?: {
       intent?: string;
-      lookingFor?: string;
       lookingForGender?: string;
       ageRangeMin?: number;
       ageRangeMax?: number;
@@ -317,8 +316,7 @@ async function main() {
   if (
     mayaProfile.gender !== "female" ||
     mayaProfile.lookingForGender !== "male" ||
-    mayaProfile.prefs?.intent !== "relationship" ||
-    mayaProfile.prefs?.lookingFor !== "relationship"
+    mayaProfile.prefs?.intent !== "relationship"
   ) {
     failures.push(`onboard did not persist Spark gender/intent: ${JSON.stringify(mayaProfile)}`);
   } else console.log("ok  onboard persisted Spark gender / lookingForGender / intent");

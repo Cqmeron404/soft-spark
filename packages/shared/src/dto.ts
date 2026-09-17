@@ -116,10 +116,8 @@ export type UserDto = {
     maxTravelKm: number;
     maxTravelMiles: number;
     dealbreakers: string[];
-    /** Spark lock: relationship | casual | unsure. */
+    /** Spark lock: relationship | casual | unsure. Not gender. */
     intent: Intent;
-    /** Alias of intent for the existing match-engine snapshot. Not gender. */
-    lookingFor: LookingFor | string;
     lookingForGender: LookingForGender;
     ageRangeMin?: number;
     ageRangeMax?: number;
@@ -155,9 +153,9 @@ export type OnboardBody = {
     maxTravelKm?: number;
     maxTravelMiles?: number;
     dealbreakers: string[];
-    /** Spark lock name for relationship intent. */
+    /** Spark lock: relationship | casual | unsure. Not gender. */
     intent?: Intent | string;
-    /** Legacy alias of intent — not gender. */
+    /** @deprecated Legacy onboard write for intent. Stored as intent. Never gender. */
     lookingFor?: LookingFor | string;
     lookingForGender?: LookingForGender;
     ageRangeMin?: number;
