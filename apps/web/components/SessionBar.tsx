@@ -10,25 +10,27 @@ import { SESSION_EVENT, clearSession, readSession, type SessionUser } from "@/li
 export function SessionBar() {
   const pathname = usePathname();
   const [current, setCurrent] = useState<SessionUser | null>(null);
+  const [signedOutLanding, setSignedOutLanding] = useState(false);
 
   useEffect(() => {
     function refresh() {
       setCurrent(readSession());
+      setSignedOutLanding(new URLSearchParams(window.location.search).get("out") === "1");
     }
     refresh();
     window.addEventListener(SESSION_EVENT, refresh);
     return () => window.removeEventListener(SESSION_EVENT, refresh);
   }, [pathname]);
 
-  const authPage = pathname.startsWith("/auth/") || pathname === "/signin" || pathname === "/signup";
-  const homeHref = current ? "/" : "/";
+  const welcomeChrome = pathname === "/" && (!current || signedOutLanding);
+  const homeHref = "/";
   const initial = current?.displayName.trim().slice(0, 1).toUpperCase() || "?";
 
   return (
     <header className="ss-phone-header">
       <BrandMark href={homeHref} />
       <nav style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--ss-text-muted)" }}>
-        {current ? (
+        {current && !welcomeChrome ? (
           <>
             <span
               aria-hidden
