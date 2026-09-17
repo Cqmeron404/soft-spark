@@ -23,10 +23,21 @@ function mutualInterest(a: UserProfileSnapshot, b: UserProfileSnapshot): boolean
   return wants(a.interested_in, b.gender) && wants(b.interested_in, a.gender);
 }
 
+function canonGender(value: string): string {
+  const g = value.toLowerCase();
+  if (g === "woman" || g === "female") return "female";
+  if (g === "man" || g === "male") return "male";
+  return g;
+}
+
 function wants(interestedIn: string[], gender: string): boolean {
-  const set = interestedIn.map((s) => s.toLowerCase());
-  const g = gender.toLowerCase();
-  return set.includes("everyone") || set.includes("any") || set.includes(g);
+  const set = interestedIn.map((s) => canonGender(s));
+  const g = canonGender(gender);
+  return (
+    interestedIn.some((s) => ["everyone", "any", "both"].includes(s.toLowerCase())) ||
+    set.includes("both") ||
+    set.includes(g)
+  );
 }
 
 function hitsDealbreaker(dealbreakers: string[], other: UserProfileSnapshot): boolean {

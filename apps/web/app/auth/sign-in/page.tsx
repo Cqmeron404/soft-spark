@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppLogo, SoftError } from "@soft-spark/ui";
-import { DEMO_ACCOUNTS } from "@soft-spark/shared";
+import { DemoSignInButtons } from "@/components/DemoSignInButtons";
 import { getMe } from "@/lib/api";
 import { signInEmail } from "@/lib/auth";
 import { writeSession } from "@/lib/session";
@@ -16,19 +16,15 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submit(credentials?: { email: string; password: string }) {
-    const nextEmail = credentials?.email ?? email;
-    const nextPassword = credentials?.password ?? password;
-    setEmail(nextEmail);
-    setPassword(nextPassword);
+  async function submit() {
     setError(null);
     setBusy(true);
     try {
-      await signInEmail({ email: nextEmail, password: nextPassword });
+      await signInEmail({ email, password });
       try {
         const me = await getMe();
         writeSession({ id: me.id, displayName: me.displayName });
-        router.replace("/matches");
+        router.replace("/");
       } catch {
         router.replace("/onboard");
       }
@@ -41,8 +37,8 @@ export default function SignInPage() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <AppLogo variant="wordmark" size={72} />
-      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 32, margin: 0 }}>Welcome back</h1>
+      <AppLogo variant="wordmark" size={64} />
+      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 30, margin: 0 }}>Sign in</h1>
       <label style={{ display: "grid", gap: 6 }}>
         Email
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" />
@@ -58,39 +54,17 @@ export default function SignInPage() {
       </label>
       {error ? <SoftError>{error}</SoftError> : null}
       <button type="button" className="ss-btn ss-btn-primary" disabled={busy} onClick={() => void submit()}>
-        Sign in
+        Continue
       </button>
+      <DemoSignInButtons
+        busy={busy}
+        onBusy={setBusy}
+        onError={(m) => setError(m || null)}
+        then={(path) => window.location.assign(path)}
+      />
       <p style={{ margin: 0 }}>
-        <Link href="/auth/sign-up">Create account</Link>
+        New here? <Link href="/auth/sign-up">Create your bot</Link>
       </p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          className="ss-btn ss-btn-ghost"
-          disabled={busy}
-          onClick={() =>
-            void submit({
-              email: DEMO_ACCOUNTS.maya.email,
-              password: DEMO_ACCOUNTS.maya.password,
-            })
-          }
-        >
-          Maya demo
-        </button>
-        <button
-          type="button"
-          className="ss-btn ss-btn-ghost"
-          disabled={busy}
-          onClick={() =>
-            void submit({
-              email: DEMO_ACCOUNTS.jordan.email,
-              password: DEMO_ACCOUNTS.jordan.password,
-            })
-          }
-        >
-          Jordan demo
-        </button>
-      </div>
     </div>
   );
 }

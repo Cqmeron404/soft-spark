@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ClientRealtimeEvent, MatchListItem } from "@soft-spark/shared";
 import { ConnectingCaption, MatchCard, SoftToast } from "@soft-spark/ui";
-import { BotSearchAction } from "@/components/BotSearchAction";
-import { listMatches } from "@/lib/api";
+import { BotSearchAction, matchHref } from "@/components/BotSearchAction";
+import { getBot, listMatches } from "@/lib/api";
+import { ensureGuestSession } from "@/lib/guest-session";
 import { useMatchRealtime } from "@/lib/realtime";
 import { readSession } from "@/lib/session";
 
@@ -15,27 +16,41 @@ function isLiveMatch(state: string) {
 
 export default function MatchesPage() {
   const router = useRouter();
+  const [autoRoam, setAutoRoam] = useState(false);
   const [items, setItems] = useState<MatchListItem[] | null>(null);
+  const [botName, setBotName] = useState("Your bot");
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ matchId: string } | null>(null);
 
   async function load() {
-    const session = readSession();
-    if (!session) {
-      router.replace("/auth/sign-in");
+    try {
+      await ensureGuestSession();
+    } catch {
+      router.replace("/");
+      return;
+    }
+    if (!readSession()) {
+      router.replace("/");
       return;
     }
     try {
       setItems(await listMatches());
+      try {
+        const bot = await getBot();
+        setBotName(bot.botDisplayName ?? bot.displayName ?? "Your bot");
+      } catch {
+        router.replace("/onboard");
+      }
     } catch (err) {
       const status = (err as { status?: number }).status;
-      if (status === 401) router.replace("/auth/sign-in");
+      if (status === 401) router.replace("/");
       else if (status === 404) router.replace("/onboard");
       else setError(err instanceof Error ? err.message : "Failed to load");
     }
   }
 
   useEffect(() => {
+    setAutoRoam(new URLSearchParams(window.location.search).get("roam") === "1");
     void load();
   }, []);
 
@@ -54,13 +69,9 @@ export default function MatchesPage() {
   });
 
   const liveItems = items?.filter((m) => isLiveMatch(m.state)) ?? [];
-  const showSearch = items !== null && liveItems.length === 0;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 28, margin: 0 }}>
-        Your bots are out
-      </h1>
       <ConnectingCaption live={live} />
       {toast ? (
         <SoftToast
@@ -71,9 +82,21 @@ export default function MatchesPage() {
         />
       ) : null}
       {error ? <p className="ss-error">{error === "unauthorized" ? "Sign in to keep your bot dating" : error}</p> : null}
-      {showSearch ? <BotSearchAction /> : null}
+      {items !== null ? (
+        <BotSearchAction
+          autoStart={autoRoam && liveItems.length === 0}
+          botName={botName}
+          targets={liveItems.map((m) => ({ id: m.id, band: m.band }))}
+          onSelectTarget={(id) => {
+            const match = liveItems.find((m) => m.id === id);
+            if (!match) return;
+            const href = matchHref(match);
+            if (href !== "/matches") router.push(href);
+          }}
+        />
+      ) : null}
       <div style={{ display: "grid", gap: 12 }}>
-        {items?.map((m) => (
+        {liveItems.map((m) => (
           <MatchCard
             key={m.id}
             peerName={m.peer?.displayName ?? "Someone"}
@@ -81,9 +104,8 @@ export default function MatchesPage() {
             reasons={m.reasons}
             photoUrl={m.peer?.photoUrl}
             onOpen={() => {
-              if (m.state === "invite_ready" || m.state === "invited" || m.state === "booked") {
-                router.push(`/matches/${m.id}/reveal`);
-              }
+              const href = matchHref(m);
+              if (href !== "/matches") router.push(href);
             }}
           />
         ))}

@@ -1,9 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import "@soft-spark/ui/tokens.css";
 import "./globals.css";
-import { SessionBar } from "@/components/SessionBar";
-import { PushOptIn } from "@/components/PushOptIn";
+import { AppShell } from "@/components/AppShell";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces" });
@@ -11,6 +10,11 @@ const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces" });
 export const metadata: Metadata = {
   title: "Soft Spark",
   description: "Your bot dates. You show up.",
+  appleWebApp: {
+    capable: true,
+    title: "Soft Spark",
+    statusBarStyle: "default",
+  },
   icons: {
     icon: [
       { url: "/brand/svg/soft-spark-favicon.svg", type: "image/svg+xml" },
@@ -18,6 +22,13 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/brand/png/soft-spark-favicon-180.png" }],
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -28,9 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`ss-page ${inter.variable} ${fraunces.variable}`}>
-        <SessionBar />
-        <PushOptIn />
-        <main style={{ maxWidth: 560, margin: "0 auto", padding: 20 }}>{children}</main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

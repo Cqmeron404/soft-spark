@@ -18,8 +18,10 @@ import type {
   InviteStatus,
   InviteUserStatus,
   LookingFor,
+  LookingForGender,
   MatchState,
   PriceTier,
+  RoamStatus,
 } from "@soft-spark/shared";
 import type { ChemistryDims, Place } from "@soft-spark/match-engine";
 
@@ -38,6 +40,17 @@ export type UserRecord = {
   homeTz: string;
   botDatingOptIn: boolean;
   status: string;
+  height?: string;
+  heightCm?: number;
+  hairColor?: string;
+  eyeColor?: string;
+  city?: string;
+  neighborhood?: string;
+  likes: string[];
+  dislikes: string[];
+  hobbies: string[];
+  job?: string;
+  education?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -48,6 +61,11 @@ export type BotRecord = {
   vibeTags: string[];
   active: boolean;
   paused: boolean;
+  displayName?: string;
+  vibeLine?: string;
+  publishedAt?: string;
+  preferredAction: "roam" | "wait";
+  roamStatus?: RoamStatus;
 };
 
 export type PreferenceRecord = {
@@ -58,6 +76,9 @@ export type PreferenceRecord = {
   maxTravelKm: number;
   dealbreakers: string[];
   lookingFor: LookingFor;
+  lookingForGender?: LookingForGender;
+  ageRangeMin?: number;
+  ageRangeMax?: number;
   interests: string[];
 };
 
@@ -173,6 +194,17 @@ function asUser(row: typeof users.$inferSelect): UserRecord {
     homeTz: row.homeTz,
     botDatingOptIn: row.botDatingOptIn,
     status: row.status,
+    height: row.height ?? undefined,
+    heightCm: row.heightCm ?? undefined,
+    hairColor: row.hairColor ?? undefined,
+    eyeColor: row.eyeColor ?? undefined,
+    city: row.city ?? undefined,
+    neighborhood: row.neighborhood ?? undefined,
+    likes: row.likes ?? [],
+    dislikes: row.dislikes ?? [],
+    hobbies: row.hobbies ?? [],
+    job: row.job ?? undefined,
+    education: row.education ?? undefined,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
   };
@@ -185,6 +217,13 @@ function asBot(row: typeof datingBots.$inferSelect): BotRecord {
     vibeTags: row.vibeTags ?? [],
     active: row.active,
     paused: row.paused,
+    displayName: row.displayName ?? undefined,
+    vibeLine: row.vibeLine ?? undefined,
+    publishedAt: row.publishedAt ? iso(row.publishedAt) : undefined,
+    preferredAction: row.preferredAction === "roam" ? "roam" : "wait",
+    roamStatus: row.roamStatus === "roaming" || row.roamStatus === "paused" || row.roamStatus === "draft"
+      ? row.roamStatus
+      : undefined,
   };
 }
 
@@ -197,6 +236,12 @@ function asPrefs(row: typeof preferences.$inferSelect): PreferenceRecord {
     maxTravelKm: row.maxTravelKm,
     dealbreakers: row.dealbreakers ?? [],
     lookingFor: (row.lookingFor as LookingFor) ?? "unsure",
+    lookingForGender:
+      row.lookingForGender === "male" || row.lookingForGender === "female" || row.lookingForGender === "both"
+        ? row.lookingForGender
+        : undefined,
+    ageRangeMin: row.ageRangeMin ?? undefined,
+    ageRangeMax: row.ageRangeMax ?? undefined,
     interests: row.interests ?? [],
   };
 }
@@ -299,6 +344,17 @@ export function createDbStore(db: SparkDb) {
           homeLng: input.homeLng,
           homeTz: input.homeTz,
           botDatingOptIn: input.botDatingOptIn,
+          height: input.height,
+          heightCm: input.heightCm,
+          hairColor: input.hairColor,
+          eyeColor: input.eyeColor,
+          city: input.city,
+          neighborhood: input.neighborhood,
+          likes: input.likes ?? [],
+          dislikes: input.dislikes ?? [],
+          hobbies: input.hobbies ?? [],
+          job: input.job,
+          education: input.education,
         })
         .returning();
       return asUser(row);
@@ -317,6 +373,17 @@ export function createDbStore(db: SparkDb) {
             homeLat: patch.homeLat,
             homeLng: patch.homeLng,
             homeTz: patch.homeTz,
+            height: patch.height,
+            heightCm: patch.heightCm,
+            hairColor: patch.hairColor,
+            eyeColor: patch.eyeColor,
+            city: patch.city,
+            neighborhood: patch.neighborhood,
+            likes: patch.likes,
+            dislikes: patch.dislikes,
+            hobbies: patch.hobbies,
+            job: patch.job,
+            education: patch.education,
             updatedAt: new Date(),
           })
         )
@@ -334,6 +401,11 @@ export function createDbStore(db: SparkDb) {
           vibeTags: input.vibeTags,
           active: input.active,
           paused: input.paused,
+          displayName: input.displayName,
+          vibeLine: input.vibeLine,
+          publishedAt: input.publishedAt ? new Date(input.publishedAt) : undefined,
+          preferredAction: input.preferredAction ?? "wait",
+          roamStatus: input.roamStatus,
         })
         .returning();
       return asBot(row);
@@ -351,6 +423,11 @@ export function createDbStore(db: SparkDb) {
           vibeTags: patch.vibeTags ?? cur.vibeTags,
           paused: patch.paused ?? cur.paused,
           active: patch.active ?? cur.active,
+          displayName: patch.displayName ?? cur.displayName,
+          vibeLine: patch.vibeLine ?? cur.vibeLine,
+          publishedAt: patch.publishedAt ? new Date(patch.publishedAt) : cur.publishedAt ? new Date(cur.publishedAt) : null,
+          preferredAction: patch.preferredAction ?? cur.preferredAction,
+          roamStatus: patch.roamStatus ?? cur.roamStatus,
         })
         .where(eq(datingBots.id, cur.id))
         .returning();
@@ -367,6 +444,9 @@ export function createDbStore(db: SparkDb) {
           maxTravelKm: input.maxTravelKm,
           dealbreakers: input.dealbreakers,
           lookingFor: input.lookingFor,
+          lookingForGender: input.lookingForGender,
+          ageRangeMin: input.ageRangeMin,
+          ageRangeMax: input.ageRangeMax,
           interests: input.interests,
         })
         .returning();
@@ -387,6 +467,9 @@ export function createDbStore(db: SparkDb) {
           maxTravelKm: patch.maxTravelKm ?? cur.maxTravelKm,
           dealbreakers: patch.dealbreakers ?? cur.dealbreakers,
           lookingFor: patch.lookingFor ?? cur.lookingFor,
+          lookingForGender: patch.lookingForGender ?? cur.lookingForGender,
+          ageRangeMin: patch.ageRangeMin ?? cur.ageRangeMin,
+          ageRangeMax: patch.ageRangeMax ?? cur.ageRangeMax,
           interests: patch.interests ?? cur.interests,
         })
         .where(eq(preferences.id, cur.id))

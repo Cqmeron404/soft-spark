@@ -47,7 +47,7 @@ export function AppLogo(props: {
   );
 }
 
-/** SessionBar chrome: Ember mark 24px + Soft Spark word (never “Spark” alone). */
+/** SessionBar chrome: Ember mark 28px + Soft Spark word (never “Spark” alone). */
 export function BrandMark({ href = "/" }: { href?: string }) {
   return (
     <a
@@ -55,13 +55,13 @@ export function BrandMark({ href = "/" }: { href?: string }) {
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 8,
+        gap: 10,
         color: "inherit",
         textDecoration: "none",
-        minHeight: 24,
+        minHeight: 28,
       }}
     >
-      <AppLogo variant="mark" size={24} alt="" />
+      <AppLogo variant="mark" size={28} alt="" />
       <span style={{ fontFamily: "var(--ss-font-display)", fontWeight: 600, fontSize: 18 }}>
         {PRODUCT_NAME}
       </span>

@@ -7,3 +7,4 @@ export * from "./realtime";
 export * from "./invite-copy";
 export * from "./push";
 export * from "./demo";
+export * from "./profile";

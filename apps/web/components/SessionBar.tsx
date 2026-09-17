@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@soft-spark/ui";
-import { signOut } from "@/lib/auth";
+import { signOut, writeToken } from "@/lib/auth";
 import { SESSION_EVENT, clearSession, readSession, type SessionUser } from "@/lib/session";
 
 export function SessionBar() {
@@ -20,41 +20,54 @@ export function SessionBar() {
     return () => window.removeEventListener(SESSION_EVENT, refresh);
   }, [pathname]);
 
-  const authPage = pathname.startsWith("/auth/") || pathname === "/signin" || pathname === "/signup";
-  const homeHref = current ? "/matches" : "/";
+  const homeHref = "/";
+  const initial = current?.displayName.trim().slice(0, 1).toUpperCase() || "?";
 
   return (
-    <header
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        gap: 12,
-        alignItems: "center",
-        padding: "12px 20px",
-        borderBottom: "1px solid var(--ss-border)",
-      }}
-    >
+    <header className="ss-phone-header">
       <BrandMark href={homeHref} />
       <nav style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--ss-text-muted)" }}>
-        {!authPage && !current ? <Link href="/auth/sign-in">Sign in</Link> : null}
         {current ? (
           <>
-            <span>{current.displayName}</span>
-            <Link href="/onboard">Profile</Link>
+            <span
+              aria-hidden
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 999,
+                background: "var(--ss-accent)",
+                color: "var(--ss-text)",
+                display: "grid",
+                placeItems: "center",
+                fontWeight: 700,
+                fontSize: 13,
+              }}
+            >
+              {initial}
+            </span>
             <button
               type="button"
+              id="ss-sign-out"
               className="ss-btn ss-btn-ghost"
-              style={{ minHeight: 32 }}
-              onClick={async () => {
-                await signOut();
+              style={{ minHeight: 44, padding: "0 12px", fontSize: 13, zIndex: 2 }}
+              onClick={() => {
                 clearSession();
-                window.location.href = "/auth/sign-in";
+                writeToken(null);
+                void signOut()
+                  .catch(() => undefined)
+                  .finally(() => {
+                    window.location.assign("/onboard?new=1");
+                  });
               }}
             >
               Sign out
             </button>
           </>
-        ) : null}
+        ) : (
+          <Link href="/auth/sign-in" style={{ fontSize: 13, color: "var(--ss-text-muted)" }}>
+            Sign in
+          </Link>
+        )}
       </nav>
     </header>
   );

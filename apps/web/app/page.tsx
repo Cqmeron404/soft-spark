@@ -2,60 +2,123 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { AppLogo, PRODUCT_NAME, TAGLINE } from "@soft-spark/ui";
-import { getMe } from "@/lib/api";
+import type { BotDto, UserDto } from "@soft-spark/shared";
+import { TAGLINE } from "@soft-spark/ui";
+import { SearchVizPanel } from "@soft-spark/ui/search-viz";
+import { OnboardWizard } from "@/components/OnboardWizard";
 import { getAuthSession } from "@/lib/auth";
+import { getBot, getMe } from "@/lib/api";
+import { ensureGuestSession } from "@/lib/guest-session";
 import { writeSession } from "@/lib/session";
 
 export default function Home() {
-  const router = useRouter();
-  const [mode, setMode] = useState<"loading" | "landing">("loading");
+  const [mode, setMode] = useState<"loading" | "create" | "home">("loading");
+  const [me, setMe] = useState<UserDto | null>(null);
+  const [bot, setBot] = useState<BotDto | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const session = await getAuthSession();
-      if (!session?.user) {
-        setMode("landing");
+      const signedOut = new URLSearchParams(window.location.search).get("out") === "1";
+      try {
+        if (signedOut) {
+          await ensureGuestSession("You", { replace: true });
+        } else {
+          const session = await getAuthSession();
+          if (!session?.user) await ensureGuestSession();
+        }
+      } catch {
+        setMode("create");
         return;
       }
       try {
-        const me = await getMe();
-        writeSession({ id: me.id, displayName: me.displayName });
-        router.replace("/matches");
+        const profile = await getMe();
+        writeSession({ id: profile.id, displayName: profile.displayName });
+        setMe(profile);
+        try {
+          setBot(await getBot());
+        } catch {
+          setBot(null);
+        }
+        setMode("home");
       } catch {
-        router.replace("/onboard");
+        setMode("create");
       }
     })();
-  }, [router]);
+  }, []);
 
-  if (mode !== "landing") {
+  if (mode === "loading") {
     return <p style={{ color: "var(--ss-text-muted)" }}>Catching up…</p>;
   }
 
+  if (mode === "create" || !me) {
+    return <OnboardWizard />;
+  }
+
+  const botName = bot?.botDisplayName?.trim() || bot?.displayName?.trim() || `${me.displayName}'s bot`;
+  const published = Boolean(bot?.publishedAt);
+  const roaming = bot?.roamStatus === "roaming";
+
   return (
-    <div style={{ display: "grid", gap: 24, paddingTop: 12 }}>
-      <div style={{ display: "grid", gap: 12, justifyItems: "start" }}>
-        <AppLogo variant="wordmark" size={88} />
-        <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 32, margin: 0, lineHeight: 1.15 }}>
-          {TAGLINE}
+    <div style={{ display: "grid", gap: 18 }}>
+      <div style={{ display: "grid", gap: 8, justifyItems: "start" }}>
+        <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 13, fontWeight: 600 }}>Home</p>
+        <h1 style={{ fontFamily: "var(--ss-font-display)", fontSize: 30, margin: 0 }}>
+          Hey, {me.displayName}
         </h1>
-        <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 16, lineHeight: 1.4 }}>
-          Blind dates, agent-matched. Status only until both of you accept the same invite.
+        <p style={{ margin: 0, color: "var(--ss-text-muted)", lineHeight: 1.45 }}>
+          {TAGLINE}
+        </p>
+        <p style={{ margin: 0, color: "var(--ss-text-muted)", lineHeight: 1.45 }}>
+          {roaming
+            ? `${botName} is roaming.`
+            : published
+              ? `${botName} is paused.`
+              : `Finish setup so ${botName} can go out.`}
         </p>
       </div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <Link href="/auth/sign-up" className="ss-btn ss-btn-primary" style={{ display: "inline-flex", alignItems: "center" }}>
-          Get started
+      <div className="ss-card" style={{ display: "grid", gap: 10 }}>
+        <p style={{ margin: 0, fontFamily: "var(--ss-font-display)", fontSize: 22 }}>{botName}</p>
+        <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 14 }}>
+          {bot?.roamStatus === "roaming" ? "Roaming" : bot?.roamStatus === "paused" ? "Paused" : "Draft"}
+        </p>
+        {bot?.vibeLine ? (
+          <p style={{ margin: 0, color: "var(--ss-text-muted)" }}>{bot.vibeLine}</p>
+        ) : null}
+        <div className="ss-chip-row">
+          {(bot?.styleTags ?? bot?.vibeTags ?? []).map((tag) => (
+            <span key={tag} className="ss-chip ss-chip-on">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+      {published ? (
+        <SearchVizPanel
+          compact
+          phase={roaming ? "searching" : "idle"}
+          lookingForGender={me.lookingForGender ?? me.prefs.lookingForGender}
+          youGender={me.gender}
+          botName={botName}
+          band={roaming ? "building" : "low"}
+        />
+      ) : null}
+      {published ? (
+        <Link href="/matches?roam=1" className="ss-btn ss-btn-primary">
+          Roam / find a match
         </Link>
-        <Link href="/auth/sign-in" className="ss-btn ss-btn-ghost" style={{ display: "inline-flex", alignItems: "center" }}>
-          Sign in
+      ) : (
+        <Link href="/onboard" className="ss-btn ss-btn-primary">
+          Finish setup
+        </Link>
+      )}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Link href="/create" className="ss-btn ss-btn-ghost">
+          Bot settings
+        </Link>
+        <Link href="/profile" className="ss-btn ss-btn-ghost">
+          Edit profile
         </Link>
       </div>
-      <p style={{ margin: 0, color: "var(--ss-text-muted)", fontSize: 14 }}>
-        No swipe. No peeking at agent chat. Both sides must accept.
-      </p>
-      <footer style={{ color: "var(--ss-text-muted)", fontSize: 13 }}>{PRODUCT_NAME}</footer>
     </div>
   );
 }

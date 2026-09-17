@@ -6,6 +6,10 @@ export function kmToMiles(km: number): number {
   return Math.round(km * MILES_PER_KM * 10) / 10;
 }
 
+export function milesToKm(miles: number): number {
+  return Math.max(1, Math.round(miles * KM_PER_MILE));
+}
+
 export function formatMilesFromKm(km: number): string {
   return kmToMiles(km).toFixed(1);
 }

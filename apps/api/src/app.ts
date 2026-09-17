@@ -2,7 +2,24 @@ import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { SparkDb } from "@soft-spark/db";
-import type { LookingFor, OnboardBody, PriceTier } from "@soft-spark/shared";
+import type { OnboardBody, PriceTier } from "@soft-spark/shared";
+import {
+  BIO_MAX,
+  BOT_NAME_MAX,
+  VIBE_LINE_MAX,
+  geoForPlace,
+  interestedInFromLookingForGender,
+  lookingForGenderFromInterestedIn,
+  milesToKm,
+  normalizeGender,
+  normalizeIntent,
+  normalizeLookingForGender,
+  normalizePreferredAction,
+  normalizeShortText,
+  normalizeTagList,
+  parseHeightCm,
+  roamStatusFor,
+} from "@soft-spark/shared";
 import type { Auth } from "./auth.js";
 import { authMode, resolveSession } from "./auth.js";
 import type { EventLog } from "./event-log.js";
@@ -69,53 +86,90 @@ export function createApp(deps: AppDeps) {
     }
     const profile = body.profile;
     const prefs = body.prefs;
-    if (!profile?.displayName || !profile.age || !profile.gender) {
-      return c.json({ error: "profile.displayName, age, gender required" }, 400);
+    if (!profile?.displayName || !profile.age || !normalizeGender(profile.gender)) {
+      return c.json({ error: "profile.displayName, age, and gender (male|female) required" }, 400);
     }
-    if (!prefs?.cuisine?.length || !prefs.maxTravelKm || !prefs.budget) {
-      return c.json({ error: "prefs cuisine, budget, maxTravelKm required" }, 400);
+    const maxTravelKm =
+      prefs?.maxTravelKm ??
+      (typeof prefs?.maxTravelMiles === "number" ? milesToKm(prefs.maxTravelMiles) : 0);
+    if (!prefs?.cuisine?.length || !maxTravelKm || !prefs.budget) {
+      return c.json({ error: "prefs cuisine, budget, and travel distance required" }, 400);
     }
-    if (!body.homeGeo) return c.json({ error: "homeGeo required" }, 400);
+    if (!body.homeGeo && !profile.city) return c.json({ error: "homeGeo or profile.city required" }, 400);
 
     const session = await resolveSession(auth, db, c.req.raw.headers);
     const email = session?.user.email ?? `${authId}@users.softspark`;
     const existing = await store.userByAuthId(authId);
+    const hobbies = normalizeTagList(profile.hobbies ?? prefs.interests);
+    const place = geoForPlace(profile.city, profile.neighborhood);
+    const lookingForGender =
+      normalizeLookingForGender(prefs.lookingForGender ?? profile.lookingForGender) ??
+      (profile.interestedIn?.length ? lookingForGenderFromInterestedIn(profile.interestedIn) : undefined);
+    if (!lookingForGender) {
+      return c.json({ error: "lookingForGender (male|female|both) required" }, 400);
+    }
+    const gender = normalizeGender(profile.gender)!;
+    const intent = normalizeIntent(prefs.intent ?? prefs.lookingFor);
+    const heightCm = parseHeightCm(profile.heightCm ?? profile.height);
+    const hairColor = normalizeShortText(profile.hair ?? profile.hairColor);
+    const eyeColor = normalizeShortText(profile.eyes ?? profile.eyeColor);
+    const profilePatch = {
+      displayName: profile.displayName,
+      age: profile.age,
+      gender,
+      interestedIn:
+        profile.interestedIn?.length ? profile.interestedIn : interestedInFromLookingForGender(lookingForGender),
+      bio: normalizeShortText(profile.bio, BIO_MAX),
+      photoUrl: body.photoUrl,
+      homeLat: body.homeGeo?.lat ?? place.lat,
+      homeLng: body.homeGeo?.lng ?? place.lng,
+      homeTz: body.homeTz ?? "America/Denver",
+      height: normalizeShortText(profile.height) ?? (heightCm ? `${heightCm} cm` : undefined),
+      heightCm,
+      hairColor,
+      eyeColor,
+      city: normalizeShortText(profile.city ?? place.city),
+      neighborhood: normalizeShortText(profile.neighborhood ?? place.neighborhood),
+      likes: normalizeTagList(profile.likes),
+      dislikes: normalizeTagList(profile.dislikes),
+      hobbies,
+    };
+    const botName = normalizeShortText(body.botDisplayName ?? body.botName, BOT_NAME_MAX);
+    const vibeLine = normalizeShortText(body.vibeLine, VIBE_LINE_MAX);
+    const preferredAction = normalizePreferredAction(body.preferredAction);
+    const publishedAt = body.publish ? new Date().toISOString() : undefined;
+    const vibeTags = body.styleTags ?? body.vibeTags ?? [];
+    const roamStatus = roamStatusFor({ publishedAt, preferredAction, paused: false });
     const user = existing
-      ? await store.updateUser(existing.id, {
-          displayName: profile.displayName,
-          age: profile.age,
-          gender: profile.gender,
-          interestedIn: profile.interestedIn ?? [],
-          bio: profile.bio,
-          photoUrl: body.photoUrl,
-          homeLat: body.homeGeo.lat,
-          homeLng: body.homeGeo.lng,
-          homeTz: body.homeTz ?? "America/Denver",
-        })
+      ? await store.updateUser(existing.id, profilePatch)
       : await store.createUser({
           authId,
           email,
-          displayName: profile.displayName,
-          age: profile.age,
-          gender: profile.gender,
-          interestedIn: profile.interestedIn ?? [],
-          bio: profile.bio,
-          photoUrl: body.photoUrl,
-          homeLat: body.homeGeo.lat,
-          homeLng: body.homeGeo.lng,
-          homeTz: body.homeTz ?? "America/Denver",
+          ...profilePatch,
           botDatingOptIn: true,
         });
 
     if (!(await store.botForUser(user.id))) {
       await store.createBot({
         userId: user.id,
-        vibeTags: body.vibeTags ?? [],
+        vibeTags,
         active: true,
         paused: false,
+        displayName: botName,
+        vibeLine,
+        publishedAt,
+        preferredAction,
+        roamStatus,
       });
-    } else if (body.vibeTags) {
-      await store.updateBot(user.id, { vibeTags: body.vibeTags });
+    } else {
+      await store.updateBot(user.id, {
+        vibeTags,
+        displayName: botName,
+        vibeLine,
+        publishedAt,
+        preferredAction: body.preferredAction ? preferredAction : undefined,
+        roamStatus,
+      });
     }
 
     try {
@@ -123,20 +177,26 @@ export function createApp(deps: AppDeps) {
       await store.updatePrefs(user.id, {
         cuisine: prefs.cuisine,
         budget: prefs.budget as PriceTier,
-        maxTravelKm: prefs.maxTravelKm,
+        maxTravelKm,
         dealbreakers: prefs.dealbreakers ?? [],
-        lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
-        interests: prefs.interests ?? [],
+        lookingFor: intent,
+        lookingForGender,
+        ageRangeMin: prefs.ageRangeMin,
+        ageRangeMax: prefs.ageRangeMax,
+        interests: hobbies.length ? hobbies : prefs.interests ?? [],
       });
     } catch {
       await store.createPrefs({
         userId: user.id,
         cuisine: prefs.cuisine,
         budget: prefs.budget as PriceTier,
-        maxTravelKm: prefs.maxTravelKm,
+        maxTravelKm,
         dealbreakers: prefs.dealbreakers ?? [],
-        lookingFor: (prefs.lookingFor as LookingFor | undefined) ?? "unsure",
-        interests: prefs.interests ?? [],
+        lookingFor: intent,
+        lookingForGender,
+        ageRangeMin: prefs.ageRangeMin,
+        ageRangeMax: prefs.ageRangeMax,
+        interests: hobbies.length ? hobbies : prefs.interests ?? [],
       });
     }
 
@@ -163,22 +223,63 @@ export function createApp(deps: AppDeps) {
       await store.updateUser(userId, {
         displayName: body.profile?.displayName,
         age: body.profile?.age,
-        gender: body.profile?.gender,
+        gender: body.profile?.gender ? normalizeGender(body.profile.gender) ?? body.profile.gender : undefined,
         interestedIn: body.profile?.interestedIn,
-        bio: body.profile?.bio,
+        bio: body.profile?.bio !== undefined ? normalizeShortText(body.profile.bio, BIO_MAX) : undefined,
         photoUrl: body.photoUrl ?? body.profile?.photoUrl,
         homeLat: body.homeGeo?.lat,
         homeLng: body.homeGeo?.lng,
+        height: body.profile?.height !== undefined ? normalizeShortText(body.profile.height) : undefined,
+        heightCm:
+          body.profile?.heightCm !== undefined || body.profile?.height !== undefined
+            ? parseHeightCm(body.profile?.heightCm ?? body.profile?.height)
+            : undefined,
+        hairColor:
+          body.profile?.hair !== undefined || body.profile?.hairColor !== undefined
+            ? normalizeShortText(body.profile.hair ?? body.profile.hairColor)
+            : undefined,
+        eyeColor:
+          body.profile?.eyes !== undefined || body.profile?.eyeColor !== undefined
+            ? normalizeShortText(body.profile.eyes ?? body.profile.eyeColor)
+            : undefined,
+        city: body.profile?.city !== undefined ? normalizeShortText(body.profile.city) : undefined,
+        neighborhood:
+          body.profile?.neighborhood !== undefined
+            ? normalizeShortText(body.profile.neighborhood)
+            : undefined,
+        likes: body.profile?.likes !== undefined ? normalizeTagList(body.profile.likes) : undefined,
+        dislikes: body.profile?.dislikes !== undefined ? normalizeTagList(body.profile.dislikes) : undefined,
+        hobbies: body.profile?.hobbies !== undefined ? normalizeTagList(body.profile.hobbies) : undefined,
       });
     }
-    if (body.prefs) {
+    if (body.profile?.city || body.profile?.neighborhood) {
+      const place = geoForPlace(body.profile.city, body.profile.neighborhood);
+      await store.updateUser(userId, { homeLat: place.lat, homeLng: place.lng });
+    }
+    if (body.prefs || body.profile?.hobbies || body.profile?.lookingForGender) {
+      const hobbies =
+        body.profile?.hobbies !== undefined ? normalizeTagList(body.profile.hobbies) : undefined;
+      const lookingForGender =
+        normalizeLookingForGender(body.prefs?.lookingForGender ?? body.profile?.lookingForGender) ??
+        (body.profile?.interestedIn ? lookingForGenderFromInterestedIn(body.profile.interestedIn) : undefined);
+      const maxTravelKm =
+        body.prefs?.maxTravelKm ??
+        (typeof body.prefs?.maxTravelMiles === "number" ? milesToKm(body.prefs.maxTravelMiles) : undefined);
+      if (lookingForGender && !body.profile?.interestedIn) {
+        await store.updateUser(userId, {
+          interestedIn: interestedInFromLookingForGender(lookingForGender),
+        });
+      }
       await store.updatePrefs(userId, {
-        cuisine: body.prefs.cuisine,
-        budget: body.prefs.budget,
-        maxTravelKm: body.prefs.maxTravelKm,
-        dealbreakers: body.prefs.dealbreakers,
-        lookingFor: body.prefs.lookingFor,
-        interests: body.prefs.interests,
+        cuisine: body.prefs?.cuisine,
+        budget: body.prefs?.budget,
+        maxTravelKm,
+        dealbreakers: body.prefs?.dealbreakers,
+        lookingFor: body.prefs?.intent ?? body.prefs?.lookingFor,
+        lookingForGender,
+        ageRangeMin: body.prefs?.ageRangeMin,
+        ageRangeMax: body.prefs?.ageRangeMax,
+        interests: hobbies ?? body.prefs?.interests,
       });
     }
     return c.json(await toUserDto(store, userId));
@@ -196,17 +297,50 @@ export function createApp(deps: AppDeps) {
     const bot = await store.botForUser(userId);
     if (!bot) return c.json({ error: "not_found" }, 404);
     const body = await c.req.json();
-    const payload = await store.updateBot(userId, {
-      vibeTags: Array.isArray(body.vibeTags) ? body.vibeTags : undefined,
-      paused: typeof body.paused === "boolean" ? body.paused : undefined,
+    const paused = typeof body.paused === "boolean" ? body.paused : undefined;
+    const preferredAction = body.preferredAction ? normalizePreferredAction(body.preferredAction) : undefined;
+    const current = await toBotDto(store, userId);
+    await store.updateBot(userId, {
+      vibeTags: Array.isArray(body.styleTags)
+        ? body.styleTags
+        : Array.isArray(body.vibeTags)
+          ? body.vibeTags
+          : undefined,
+      paused,
       active: typeof body.active === "boolean" ? body.active : undefined,
+      displayName:
+        body.botDisplayName !== undefined || body.displayName !== undefined
+          ? normalizeShortText(body.botDisplayName ?? body.displayName, BOT_NAME_MAX)
+          : undefined,
+      vibeLine: body.vibeLine !== undefined ? normalizeShortText(body.vibeLine, VIBE_LINE_MAX) : undefined,
+      preferredAction,
+      roamStatus: roamStatusFor({
+        publishedAt: current.publishedAt,
+        paused: paused ?? current.paused,
+        preferredAction: preferredAction ?? current.preferredAction,
+      }),
     });
-    return c.json({
-      id: payload.id,
-      vibeTags: payload.vibeTags,
-      active: payload.active,
-      paused: payload.paused,
+    return c.json(await toBotDto(store, userId));
+  });
+
+  app.post("/users/me/bot/publish", async (c) => {
+    const userId = c.get("userId");
+    if (!userId) return c.json({ error: "profile_incomplete" }, 404);
+    const bot = await store.botForUser(userId);
+    if (!bot) return c.json({ error: "not_found" }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { preferredAction?: string };
+    const preferredAction = body.preferredAction ? normalizePreferredAction(body.preferredAction) : "roam";
+    const publishedAt = bot.publishedAt ?? new Date().toISOString();
+    await store.updateBot(userId, {
+      preferredAction,
+      publishedAt,
+      active: true,
+      paused: preferredAction === "wait",
+      roamStatus: roamStatusFor({ publishedAt, preferredAction, paused: preferredAction === "wait" }),
     });
+    const payload = await toBotDto(store, userId);
+    assertClientSafe(payload);
+    return c.json(payload);
   });
 
   app.post("/users/me/push", async (c) => {

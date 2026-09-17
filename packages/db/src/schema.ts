@@ -78,6 +78,17 @@ export const users = pgTable("users", {
   homeTz: text("home_tz").notNull().default("America/Denver"),
   botDatingOptIn: boolean("bot_dating_opt_in").notNull(),
   status: text("status").notNull().default("active"),
+  height: text("height"),
+  heightCm: integer("height_cm"),
+  hairColor: text("hair_color"),
+  eyeColor: text("eye_color"),
+  city: text("city"),
+  neighborhood: text("neighborhood"),
+  likes: text("likes").array(),
+  dislikes: text("dislikes").array(),
+  hobbies: text("hobbies").array(),
+  job: text("job"),
+  education: text("education"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -90,6 +101,11 @@ export const datingBots = pgTable("dating_bots", {
   vibeTags: text("vibe_tags").array().notNull(),
   active: boolean("active").notNull().default(true),
   paused: boolean("paused").notNull().default(false),
+  displayName: text("display_name"),
+  vibeLine: text("vibe_line"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  preferredAction: text("preferred_action").notNull().default("wait"),
+  roamStatus: text("roam_status"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -103,6 +119,9 @@ export const preferences = pgTable("preferences", {
   maxTravelKm: integer("max_travel_km").notNull(),
   dealbreakers: text("dealbreakers").array().notNull(),
   lookingFor: text("looking_for").notNull().default("unsure"),
+  lookingForGender: text("looking_for_gender"),
+  ageRangeMin: integer("age_range_min"),
+  ageRangeMax: integer("age_range_max"),
   interests: text("interests").array().notNull(),
 });
 
