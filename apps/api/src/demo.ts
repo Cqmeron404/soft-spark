@@ -193,6 +193,13 @@ async function main() {
     failures.push("Soft Spark Vercel preview origin must be allowed for Hobby PR smoke");
   } else if (isSoftSparkVercelWebOrigin("https://evil.vercel.app")) {
     failures.push("other vercel.app apps must not be CORS-allowed");
+  } else if (
+    isSoftSparkVercelWebOrigin("https://soft-spark-git-other-acme.vercel.app") ||
+    isSoftSparkVercelWebOrigin(
+      "https://soft-spark-api-git-cursor-soft-spark-64ceb8-cameronjgroff-2605.vercel.app"
+    )
+  ) {
+    failures.push("CORS must not allow other Vercel teams or the API preview host");
   } else console.log("ok  Soft Spark Vercel preview origin allowlist");
 
   const ctx = await bootstrap({ pglite: new PGlite() });

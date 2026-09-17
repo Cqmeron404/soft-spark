@@ -323,6 +323,16 @@ async function viaAuthPreflightNoDb() {
     check(corsAllowOrigin("https://evil.example") === undefined, "corsAllowOrigin rejects other origins");
     check(corsAllowOrigin("https://evil.vercel.app") === undefined, "corsAllowOrigin rejects other vercel.app apps");
     check(
+      corsAllowOrigin("https://soft-spark-git-other-acme.vercel.app") === undefined,
+      "corsAllowOrigin rejects Soft Spark previews on another Vercel team"
+    );
+    check(
+      corsAllowOrigin(
+        "https://soft-spark-api-git-cursor-soft-spark-64ceb8-cameronjgroff-2605.vercel.app"
+      ) === undefined,
+      "corsAllowOrigin rejects the API preview host as a web Origin"
+    );
+    check(
       corsAllowOrigin("https://soft-spark-api.vercel.app") === undefined,
       "corsAllowOrigin rejects the API host as a web Origin"
     );

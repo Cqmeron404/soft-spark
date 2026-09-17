@@ -15,11 +15,14 @@ export const CORS_ALLOW_METHODS = [
 export const SOFT_SPARK_WEB_HOST = "soft-spark.vercel.app";
 /** Do not treat the API host as a browser Origin. */
 export const SOFT_SPARK_API_HOST = "soft-spark-api.vercel.app";
+/** Vercel team slug on Soft Spark Hobby preview hostnames. */
+export const SOFT_SPARK_VERCEL_TEAM = "cameronjgroff-2605";
 /**
- * Better Auth wildcard for Vercel web previews / deployment aliases
- * (`soft-spark-git-…-team.vercel.app`). Not `*.vercel.app`.
+ * Better Auth wildcard for this team's Soft Spark web previews / aliases.
+ * Not `*.vercel.app`, not other Vercel teams.
  */
-export const SOFT_SPARK_VERCEL_PREVIEW_ORIGIN_PATTERN = "https://soft-spark-*.vercel.app";
+export const SOFT_SPARK_VERCEL_PREVIEW_ORIGIN_PATTERN =
+  `https://soft-spark-*-${SOFT_SPARK_VERCEL_TEAM}.vercel.app`;
 
 /** Strip whitespace / trailing slashes so env and the browser Origin header match. */
 export function normalizeOrigin(value: string): string {
@@ -33,8 +36,8 @@ export function webOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
 }
 
 /**
- * HTTPS Soft Spark web on vercel.app: prod host plus this project's preview aliases.
- * Rejects other vercel.app apps and the API host.
+ * HTTPS Soft Spark web on vercel.app: prod host plus this team's preview aliases.
+ * Rejects other vercel.app apps, other teams, and the API host.
  */
 export function isSoftSparkVercelWebOrigin(origin: string): boolean {
   let host: string;
@@ -47,8 +50,9 @@ export function isSoftSparkVercelWebOrigin(origin: string): boolean {
     return false;
   }
   if (host === SOFT_SPARK_WEB_HOST) return true;
-  if (host === SOFT_SPARK_API_HOST) return false;
-  if (!host.endsWith(".vercel.app") || !host.startsWith("soft-spark-")) return false;
+  if (host === SOFT_SPARK_API_HOST || host.startsWith("soft-spark-api")) return false;
+  const previewSuffix = `-${SOFT_SPARK_VERCEL_TEAM}.vercel.app`;
+  if (!host.startsWith("soft-spark-") || !host.endsWith(previewSuffix)) return false;
   const label = host.slice(0, -".vercel.app".length);
   return label.length > "soft-spark-".length && !label.includes(".");
 }
