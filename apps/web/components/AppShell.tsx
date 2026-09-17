@@ -22,17 +22,19 @@ function isAuthPath(pathname: string) {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [signedIn, setSignedIn] = useState(false);
+  const [signedOutLanding, setSignedOutLanding] = useState(false);
 
   useEffect(() => {
     function refresh() {
       setSignedIn(Boolean(readSession()));
+      setSignedOutLanding(new URLSearchParams(window.location.search).get("out") === "1");
     }
     refresh();
     window.addEventListener(SESSION_EVENT, refresh);
     return () => window.removeEventListener(SESSION_EVENT, refresh);
   }, [pathname]);
 
-  const welcomeLanding = pathname === "/" && !signedIn;
+  const welcomeLanding = pathname === "/" && (!signedIn || signedOutLanding);
   const hideTabs = isAuthPath(pathname) || welcomeLanding;
 
   return (
