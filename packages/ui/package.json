@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "echo skip"
+    "build": "tsc --noEmit"
   },
   "dependencies": {
     "@soft-spark/shared": "workspace:*"
